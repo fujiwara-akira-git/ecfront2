@@ -17,6 +17,7 @@
     "db:generate": "npx prisma generate",
     "deploy:prod": "npm run build && vercel --prod",
     "postinstall": "node ./scripts/prisma-postinstall.js"
+    ,"stripe:listen": "./scripts/stripe-listen.sh"
   },
   "dependencies": {
     "@prisma/client": "^6.16.1",
