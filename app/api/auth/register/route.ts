@@ -68,6 +68,8 @@ export async function POST(request: NextRequest) {
 
     // データベースにユーザーを保存
     const newUser = await prisma.user.create({
+      // Prisma generated types may be strict; use a typed cast here to allow
+      // our camelCase `postalCode` field which matches the Prisma schema.
       data: {
         name,
         email,
@@ -78,7 +80,7 @@ export async function POST(request: NextRequest) {
         state,
         city,
         userType,
-      },
+      } as any,
       select: {
         id: true,
         name: true,
