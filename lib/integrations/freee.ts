@@ -32,11 +32,19 @@ export async function createVoucherForOrder(order: OrderPayload) {
   if (!token) throw new Error('FREEE_CLIENT_ACCESS_TOKEN not set');
 
   // Build a minimal voucher payload. This is a template — adjust per freee API.
-  const lines = [] as any[];
+  type FreeeVoucherLine = {
+    account_item_id: number | null;
+    tax_code_id?: number | null;
+    amount: number;
+    dc_type: 'credit' | 'debit';
+    description?: string;
+  };
+
+  const lines: FreeeVoucherLine[] = [];
 
   // 売上（税抜）を科目に流す
   lines.push({
-    account_item_id: process.env.FREEE_SALES_ACCOUNT_ID || null,
+    account_item_id: process.env.FREEE_SALES_ACCOUNT_ID ? Number(process.env.FREEE_SALES_ACCOUNT_ID) : null,
     tax_code_id: null,
     amount: order.amountSubtotal,
     dc_type: 'credit',
@@ -46,7 +54,7 @@ export async function createVoucherForOrder(order: OrderPayload) {
   // 消費税行（簡略）
   if (order.taxAmount && order.taxAmount > 0) {
     lines.push({
-      account_item_id: process.env.FREEE_TAX_ACCOUNT_ID || null,
+      account_item_id: process.env.FREEE_TAX_ACCOUNT_ID ? Number(process.env.FREEE_TAX_ACCOUNT_ID) : null,
       amount: order.taxAmount,
       dc_type: 'credit',
       description: `Consumption tax for ${order.id}`,
@@ -55,7 +63,7 @@ export async function createVoucherForOrder(order: OrderPayload) {
 
   // 対象の借方（受取勘定）
   lines.push({
-    account_item_id: process.env.FREEE_RECEIVABLE_ACCOUNT_ID || null,
+    account_item_id: process.env.FREEE_RECEIVABLE_ACCOUNT_ID ? Number(process.env.FREEE_RECEIVABLE_ACCOUNT_ID) : null,
     amount: order.amountTotal,
     dc_type: 'debit',
     description: `Receivable for ${order.id}`,
@@ -68,7 +76,7 @@ export async function createVoucherForOrder(order: OrderPayload) {
     // memo / partner mapping etc can be added here
   };
 
-  const res = await (globalThis.fetch as typeof fetch)(`${FREEE_API_BASE}/api/1/vouchers`, {
+  const res = await globalThis.fetch(`${FREEE_API_BASE}/api/1/vouchers`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -82,7 +90,9 @@ export async function createVoucherForOrder(order: OrderPayload) {
     throw new Error(`freee create voucher failed: ${res.status} ${txt}`);
   }
 
-  return res.json();
+  // Parse JSON safely and return as unknown for caller to narrow if desired
+  const json = await res.json().catch(() => null);
+  return json as unknown;
 }
 
 export async function ensurePartner(customer: { name?: string; email?: string; freee_partner_id?: string }) {
@@ -93,13 +103,14 @@ export async function ensurePartner(customer: { name?: string; email?: string; f
 
   // Create partner (取引先) minimal implementation
   const payload = { name: customer.name || customer.email || 'Unknown' };
-  const res = await (globalThis.fetch as typeof fetch)(`${FREEE_API_BASE}/api/1/partners`, {
+  const res = await globalThis.fetch(`${FREEE_API_BASE}/api/1/partners`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(`freee create partner failed: ${res.status}`);
-  return res.json();
+  const json = await res.json().catch(() => null);
+  return json as unknown;
 }
 
 // Helper: convert税込 to 税抜 (if needed)

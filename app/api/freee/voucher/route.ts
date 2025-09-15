@@ -11,7 +11,9 @@ export async function POST(req: Request) {
   if (body.customer) {
     try {
       const partner = await ensurePartner(body.customer);
-      body.customer.freee_partner_id = partner.id;
+      if (partner && typeof partner === 'object' && 'id' in partner && (partner as any).id) {
+        body.customer.freee_partner_id = (partner as any).id;
+      }
     } catch (err) {
       return NextResponse.json({ error: 'partner create failed', detail: String(err) }, { status: 500 });
     }
