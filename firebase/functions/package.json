@@ -1,0 +1,12 @@
+{
+  "name": "ecfront-firebase-functions",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "test-verify": "node verify-test.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^11.0.0",
+    "firebase-functions": "^4.0.0"
+  }
+}

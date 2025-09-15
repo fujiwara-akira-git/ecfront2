@@ -1,0 +1,20 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow full access when using the emulator (no auth)
+    function isEmulator() {
+      return request.auth == null && (request.headers['x-emulator-auth'] == '1' || false);
+    }
+
+    // Admin-only: allow if authenticated and has admin claim
+    function isAdmin() {
+      return request.auth != null && request.auth.token != null && request.auth.token.admin == true;
+    }
+
+    // Default rules: read allowed, write only for admin or emulator
+    match /{document=**} {
+      allow read: if true;
+      allow write: if isAdmin() || isEmulator();
+    }
+  }
+}

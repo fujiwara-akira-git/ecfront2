@@ -1,0 +1,34 @@
+name: Comment PR on CI status
+
+on:
+  workflow_run:
+    workflows: ["Build and Deploy to Vercel (with Prisma generate on Linux)"]
+    types:
+      - completed
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment on PR with status
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const run = context.payload.workflow_run;
+            const conclusion = run.conclusion;
+            // Find PRs associated with this run
+            const prs = run.pull_requests || [];
+            if (prs.length === 0) {
+              console.log('No PRs associated with this workflow run.');
+              return;
+            }
+            const body = `CI checks for commit ${run.head_sha} completed with status: **${conclusion}**`;
+            for (const pr of prs) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body,
+              });
+            }

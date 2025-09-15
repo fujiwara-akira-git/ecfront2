@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#60a5fa" />
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <circle cx="512" cy="360" r="260" fill="url(#g)" opacity="0.95" />
+  <g transform="translate(300,520)">
+    <rect x="0" y="0" width="424" height="240" rx="24" fill="#fff" opacity="0.06" />
+    <path d="M64 120c0-40 48-120 112-120s112 80 112 120-48 80-112 80S64 160 64 120z" fill="#fff" opacity="0.9" />
+    <circle cx="320" cy="48" r="40" fill="#fff" opacity="0.9" />
+  </g>
+  <text x="50%" y="90%" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial" font-size="36" fill="#0f172a" text-anchor="middle">Hero image placeholder — Eagle Palace</text>
+</svg>

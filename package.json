@@ -1,0 +1,56 @@
+{
+  "name": "eagle-palace-ec",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "seed:emulator": "export FIRESTORE_EMULATOR_HOST=localhost:8080 && node firebase/seed/seed.js",
+    "seed": "ts-node prisma/seed.ts",
+    "emulators:start": "firebase emulators:start --only functions,firestore",
+    "emulators:stop": "firebase emulators:stop",
+    "build": "node ./scripts/prisma-generate.js && next build",
+    "start": "next start",
+    "lint": "eslint --ext .ts,.tsx,.js,.jsx .",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
+    "typecheck": "tsc --noEmit",
+    "db:migrate:prod": "NODE_ENV=production npx prisma migrate deploy",
+    "db:generate": "npx prisma generate",
+    "deploy:prod": "npm run build && vercel --prod",
+    "postinstall": "node ./scripts/prisma-postinstall.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.16.1",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.2",
+    "next": "^15.5.3",
+    "next-auth": "^4.24.11",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "stripe": "^18.5.0",
+    "stripe-cli": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.1",
+    "@types/react": "19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@typescript-eslint/eslint-plugin": "^6.7.1",
+    "@typescript-eslint/parser": "^6.7.1",
+    "eslint": "^8.50.0",
+    "eslint-config-next": "^15.5.2",
+    "husky": "^8.0.0",
+    "lint-staged": "^14.0.0",
+    "prettier": "^3.0.0",
+    "prisma": "^6.16.1",
+    "ts-node": "^10.9.2",
+    "typescript": "5.9.2"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
+  "lint-staged": {
+    "**/*.{ts,tsx,js,jsx,json,css,md}": [
+      "npx prettier --write",
+      "npm run lint --silent --fix"
+    ]
+  }
+}

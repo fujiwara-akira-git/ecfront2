@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600">
+  <rect width="1200" height="600" fill="#f8faf9"/>
+  <g fill="#93c5fd">
+    <circle cx="200" cy="250" r="120"/>
+    <rect x="340" y="200" width="420" height="220" rx="24"/>
+    <ellipse cx="980" cy="320" rx="110" ry="80"/>
+  </g>
+  <text x="80" y="120" font-size="42" fill="#064e3b" font-family="sans-serif">地元の旬をお届け</text>
+  <text x="80" y="170" font-size="20" fill="#0f172a" font-family="sans-serif">新鮮で安全な農産物をオンラインで</text>
+</svg>
