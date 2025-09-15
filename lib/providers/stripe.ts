@@ -11,6 +11,11 @@ try {
   // keep stripe as null; functions below will check and throw meaningful errors
 }
 
+const STRIPE_DEBUG = (process.env.STRIPE_DEBUG === 'true')
+function stripeDebug(...args: unknown[]) {
+  if (STRIPE_DEBUG) console.log('[stripe:debug]', ...args)
+}
+
 // Helpers for safe metadata and value parsing
 function toStringMetadata(metadata?: Record<string, any>): Record<string, string> | undefined {
   if (!metadata) return undefined
@@ -339,13 +344,16 @@ export const stripeProvider: Provider = {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
     if (!webhookSecret) {
       // No webhook secret configured: accept and parse JSON (dev only)
-      return { valid: true, payload: JSON.parse(body || '{}') }
+      const p = JSON.parse(body || '{}')
+      stripeDebug('verifyWebhook: no secret configured, payload sample:', typeof p === 'object' ? Object.keys(p).slice(0,10) : String(p))
+      return { valid: true, payload: p }
     }
     try {
       if (!stripe) {
         throw new Error('Stripe client not initialized: missing STRIPE_SECRET_KEY or initialization failed')
       }
       const event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
+      stripeDebug('verifyWebhook: constructed event type=', event.type, 'id=', event.id)
       return { valid: true, payload: event }
     } catch (err) {
       console.error('stripe webhook verification failed', err)
@@ -355,6 +363,7 @@ export const stripeProvider: Provider = {
 
   async handleWebhookEvent(payload: any) {
     console.log('stripe webhook event received:', payload?.type || '(no type)')
+    stripeDebug('raw payload keys:', payload && typeof payload === 'object' ? Object.keys(payload).slice(0,10) : String(payload))
 
     if (!payload?.id || !payload?.type) {
       console.warn('[stripe] invalid webhook payload: missing id or type')
@@ -387,6 +396,7 @@ export const stripeProvider: Provider = {
         // 2. checkout.session.completed の場合は注文とペイメントを作成
         if (payload.type === 'checkout.session.completed') {
           const sessionId = payload?.data?.object?.id
+          stripeDebug('checkout.session.completed payload.data.object keys:', payload?.data?.object && typeof payload.data.object === 'object' ? Object.keys(payload.data.object).slice(0,20) : String(payload?.data?.object))
           if (sessionId) {
             // Stripe から詳細セッション情報を取得
             if (!stripe) {
@@ -414,6 +424,16 @@ export const stripeProvider: Provider = {
             const session = await stripe.checkout.sessions.retrieve(sessionId, {
               expand: ['payment_intent', 'line_items', 'customer']
             }) as ExpandedCheckoutSession
+            stripeDebug('expanded session retrieved: id=', session.id, 'customer_details=', session.customer_details ? Object.keys(session.customer_details).slice(0,10) : undefined)
+            stripeDebug('session.shipping_details keys=', session.shipping_details ? Object.keys(session.shipping_details as any) : undefined)
+            stripeDebug('session.payment_intent (type) =', typeof session.payment_intent)
+            // log top-level line items summary
+            try {
+              const items = session.line_items && typeof session.line_items === 'object' && Array.isArray((session.line_items as any).data) ? (session.line_items as any).data.map((it: any) => ({ description: it.description, quantity: it.quantity, price: it.price && it.price.unit_amount })) : undefined
+              stripeDebug('line_items summary:', items)
+            } catch (liErr) {
+              stripeDebug('line_items parse error', liErr)
+            }
 
             // 顧客情報を取得（優先順位: session.customer_details -> Stripe Customer オブジェクト -> expanded session.customer）
             let customerDetails: Record<string, unknown> | undefined = undefined
@@ -444,6 +464,7 @@ export const stripeProvider: Provider = {
             const custIdForUserRaw = session.customer
             const custIdForUser = extractCustomerIdFromSessionCustomer(custIdForUserRaw)
             const custEmailForUser = (typeof customerDetails?.email === 'string' ? customerDetails!.email as string : extractCustomerEmail(session.customer))
+            stripeDebug('resolved customer for user:', { custIdForUser, custEmailForUser })
             if (custIdForUser && custEmailForUser) {
               try {
                 const existingUser = await tx.user.findUnique({ where: { email: custEmailForUser } })
@@ -466,6 +487,7 @@ export const stripeProvider: Provider = {
             // 住所情報を組み立て（customer_details または full customer/address から取得）
             let shippingAddress = ''
             const addrSource = getAddressFromUnknown(customerDetails?.address)
+            stripeDebug('address source normalized:', addrSource)
             if (addrSource) {
               shippingAddress = [
                 addrSource.postal_code,
@@ -510,7 +532,7 @@ export const stripeProvider: Provider = {
             // payment_intent は expand しているためオブジェクト／文字列どちらの可能性もある
             const paymentIntentRaw: unknown = session.payment_intent
             const paymentIntentId = getIdFromUnknown(paymentIntentRaw)
-            console.log('[stripe] payment_intent raw type:', typeof paymentIntentRaw, 'value:', paymentIntentRaw, 'resolved id:', paymentIntentId)
+            stripeDebug('[stripe] payment_intent raw type:', typeof paymentIntentRaw, 'resolved id:', paymentIntentId)
 
             // 既存注文IDがセッションのmetadataにあれば、その注文を paid に更新して使う
             let order: { id: string } | null = null
@@ -584,6 +606,7 @@ export const stripeProvider: Provider = {
               if (!resolvedStripeId) {
                 const piRaw: unknown = session.payment_intent
                 const chargeId = getChargeIdFromPaymentIntent(piRaw)
+                stripeDebug('resolved chargeId from payment_intent candidate:', chargeId)
                 if (chargeId) resolvedStripeId = chargeId
               }
             } catch (resolveErr) {
