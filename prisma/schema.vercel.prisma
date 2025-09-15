@@ -28,11 +28,14 @@ model User {
   email        String?    @unique
   createdAt    DateTime   @default(now())
   address      String?
+  state        String?
+  city         String?
   name         String?
   password     String?
   phone        String?
   updatedAt    DateTime   @updatedAt
   userType     String     @default("customer")
+  postalCode   String?
   stripeCustomerId String? @unique  // Stripe顧客ID
   cartItems    CartItem[]
   orders       Order[]
