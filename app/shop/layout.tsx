@@ -42,18 +42,14 @@ export default async function ShopLayout({
             <header className="bg-white/95 backdrop-blur-sm border-b shadow-sm sticky top-0 z-50">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-20">
-                  {/* シンプルロゴ */}
-                  <Link href="/shop" className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-white font-bold text-xl">
-                      EP
-                    </div>
-                    <div className="text-2xl font-bold text-gray-900">Eagle Palace</div>
-                  </Link>
+                  {/* ロゴリンクは不要のため削除（レイアウト維持のためプレースホルダ） */}
+                  <div className="w-12" />
 
                   {/* デスクトップナビゲーション - 余裕のあるスペース */}
                   <nav className="hidden md:flex items-center space-x-12">
                     <Link href="/shop" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors text-lg">ホーム</Link>
                     <Link href="/shop/products" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors text-lg">商品一覧</Link>
+                    <Link href="/shop/producers" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors text-lg">生産者</Link>
                     <Link href="/shop/cart" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors text-lg">カート</Link>
                   </nav>
 
@@ -92,6 +88,10 @@ export default async function ShopLayout({
                     <Link href="/shop/products" className="flex flex-col items-center font-medium text-gray-600 hover:text-emerald-600 transition-colors">
                       <span className="text-2xl mb-2">🛒</span>
                       <span className="text-sm">商品</span>
+                    </Link>
+                    <Link href="/shop/producers" className="flex flex-col items-center font-medium text-gray-600 hover:text-emerald-600 transition-colors">
+                      <span className="text-2xl mb-2">🌾</span>
+                      <span className="text-sm">生産者</span>
                     </Link>
                     <Link href="/shop/cart" className="flex flex-col items-center font-medium text-gray-600 hover:text-emerald-600 transition-colors">
                       <span className="text-2xl mb-2">🛍️</span>
