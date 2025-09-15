@@ -16,12 +16,17 @@ export default async function Page({ searchParams }: any) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2025-08-27.basil' })
 
   try {
+    type ExpandedCheckoutSession = Stripe.Checkout.Session & {
+      payment_intent?: Stripe.PaymentIntent | string | null
+      line_items?: Stripe.ApiList<Stripe.LineItem>
+    }
+
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['payment_intent', 'line_items'],
-    })
+    }) as ExpandedCheckoutSession
 
     const paymentIntent = (session.payment_intent as Stripe.PaymentIntent) || null
-    const lineItems = (session as any).line_items as Stripe.ApiList<Stripe.LineItem> | undefined
+    const lineItems = session.line_items
 
     return (
       <div style={{ padding: 24 }}>

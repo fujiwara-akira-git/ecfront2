@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../auth/options'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 
 // カート取得
 export async function GET() {
@@ -131,18 +132,20 @@ export async function POST(request: NextRequest) {
 
     console.log('🎉 カート追加処理完了')
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error) {
     // Prismaエラーやその他の例外を詳細に出力
-    if (error instanceof Error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      console.error('Prisma error code:', error.code)
+      console.error('Prisma error meta:', error.meta)
+    } else if (error instanceof Error) {
       console.error('カート追加エラー:', error.message)
       if (error.stack) console.error(error.stack)
-      if ((error as any).code) console.error('Prismaエラーコード:', (error as any).code)
-      if ((error as any).meta) console.error('Prismaエラー詳細:', (error as any).meta)
     } else {
       console.error('カート追加エラー:', error)
     }
+    const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json(
-      { error: 'カートへの追加に失敗しました', details: error?.message || String(error) },
+      { error: 'カートへの追加に失敗しました', details: message },
       { status: 500 }
     )
   }

@@ -5,7 +5,7 @@ import { CartProvider } from '../contexts/CartContext'
 import { ToastProvider } from '../contexts/ToastContext'
 import CartBadge from '../components/CartBadge'
 import SignOutButton from '../components/SignOutButton'
-import { getServerSession } from 'next-auth'
+import { getServerSession, type Session } from 'next-auth'
 import { authOptions } from '../api/auth/options'
 
 // このレイアウトはサーバーサイドで `getServerSession` を使用するため
@@ -22,7 +22,7 @@ export default async function ShopLayout({
 }: {
   children: React.ReactNode
 }) {
-  let session = null as any
+  let session: Session | null = null
   try {
     session = await getServerSession(authOptions)
   } catch (err) {

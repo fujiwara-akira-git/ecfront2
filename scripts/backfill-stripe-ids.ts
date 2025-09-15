@@ -53,8 +53,10 @@ async function main() {
     let sessionId: string | undefined
     try {
       const ev = events[0]
-      const payload = ev.payload as any
-      sessionId = payload?.data?.object?.id
+      const payload: unknown = ev.payload
+      if (payload && typeof payload === 'object' && 'data' in (payload as any) && (payload as any).data && (payload as any).data.object) {
+        sessionId = (payload as any).data.object.id
+      }
     } catch (err) {
       // ignore
     }
@@ -67,21 +69,25 @@ async function main() {
     console.log('  sessionId:', sessionId)
 
     try {
-      const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['payment_intent', 'payment_intent.charges'] })
+      type ExpandedCheckoutSession = Stripe.Checkout.Session & {
+        payment_intent?: Stripe.PaymentIntent | string | null
+      }
+      const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['payment_intent', 'payment_intent.charges'] }) as ExpandedCheckoutSession
       console.log('  session.amount_total:', session.amount_total)
-      const pi = session.payment_intent as any
-      if (pi) {
-        console.log('  payment_intent found:', typeof pi === 'string' ? pi : pi.id)
-        const latestCharge = pi.latest_charge || (pi.charges && pi.charges.data && pi.charges.data[0])
+      const piRaw: unknown = session.payment_intent
+      if (piRaw) {
+        const piId = typeof piRaw === 'string' ? piRaw : (typeof piRaw === 'object' && piRaw && 'id' in piRaw ? (piRaw as any).id : undefined)
+        console.log('  payment_intent found:', piId)
+        const latestCharge = (piRaw as any)?.latest_charge || ((piRaw as any)?.charges && (piRaw as any).charges.data && (piRaw as any).charges.data[0])
         if (latestCharge) {
-          console.log('  latest_charge id:', typeof latestCharge === 'string' ? latestCharge : latestCharge.id)
+          console.log('  latest_charge id:', typeof latestCharge === 'string' ? latestCharge : (latestCharge as any).id)
         }
       } else {
         console.log('  No payment_intent on session')
       }
 
       // propose update
-      const resolved = (pi && (typeof pi === 'string' ? pi : pi.id)) || (pi && (pi.latest_charge || (pi.charges && pi.charges.data && pi.charges.data[0]) && (typeof (pi.charges.data[0]) === 'string' ? pi.charges.data[0] : pi.charges.data[0].id)))
+      const resolved = (piRaw && (typeof piRaw === 'string' ? piRaw : (piRaw as any).id)) || ((piRaw as any) && ((piRaw as any).latest_charge || ((piRaw as any).charges && (piRaw as any).charges.data && (piRaw as any).charges.data[0])) && (typeof ((piRaw as any).charges.data[0]) === 'string' ? (piRaw as any).charges.data[0] : (piRaw as any).charges.data[0].id))
       console.log('  resolvedStripeId:', resolved)
 
       if (resolved && apply) {

@@ -11,6 +11,40 @@ try {
   // keep stripe as null; functions below will check and throw meaningful errors
 }
 
+// Helpers for safe metadata and value parsing
+function toStringMetadata(metadata?: Record<string, any>): Record<string, string> | undefined {
+  if (!metadata) return undefined
+  const out: Record<string, string> = {}
+  for (const key of Object.keys(metadata)) {
+    const v = metadata[key]
+    if (v === undefined || v === null) continue
+    out[key] = typeof v === 'string' ? v : String(v)
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
+function getMetadataValue(metadata: Record<string, any> | undefined, key: string): string | undefined {
+  if (!metadata) return undefined
+  const v = metadata[key]
+  if (v === undefined || v === null) return undefined
+  return typeof v === 'string' ? v : String(v)
+}
+
+function parseBooleanish(v?: string | boolean | undefined): boolean {
+  if (v === undefined || v === null) return false
+  if (typeof v === 'boolean') return v
+  if (typeof v === 'string') return v.toLowerCase() === 'true'
+  return false
+}
+
+function extractCustomerIdFromSessionCustomer(sessionCustomer: string | Stripe.Customer | Stripe.DeletedCustomer | null | undefined): string | undefined {
+  if (!sessionCustomer) return undefined
+  if (typeof sessionCustomer === 'string') return sessionCustomer
+  // object case
+  if ('id' in sessionCustomer && typeof sessionCustomer.id === 'string') return sessionCustomer.id
+  return undefined
+}
+
 export const stripeProvider: Provider = {
   async createCheckoutSession(order: OrderInput) {
     const line_items = (order.items || []).map((it) => ({
@@ -43,7 +77,7 @@ export const stripeProvider: Provider = {
       payment_method_types: ['card'],
       mode: 'payment',
       line_items,
-      metadata: order.metadata as Record<string, string> | undefined,
+  metadata: toStringMetadata(order.metadata),
       success_url: `${appUrl}/shop/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/shop/checkout/cancel`,
       billing_address_collection: 'required',
@@ -88,11 +122,18 @@ export const stripeProvider: Provider = {
         console.log('Stripe: 既存顧客を使用:', customerId)
         // 既存顧客の情報を最新化（住所・電話・氏名があれば更新）
         try {
-          const updatePayload: any = {}
+          const updatePayload: Stripe.CustomerUpdateParams = {}
           if (namePayload) updatePayload.name = namePayload
           if (phonePayload) updatePayload.phone = phonePayload
           if (addressPayload.line1 || addressPayload.line2 || addressPayload.postal_code || addressPayload.city || addressPayload.state) {
-            updatePayload.address = addressPayload
+            updatePayload.address = {
+              line1: addressPayload.line1 || undefined,
+              line2: addressPayload.line2 || undefined,
+              postal_code: addressPayload.postal_code || undefined,
+              city: addressPayload.city || undefined,
+              state: addressPayload.state || undefined,
+              country: addressPayload.country || undefined,
+            }
           }
           if (Object.keys(updatePayload).length > 0) {
             await stripe.customers.update(customerId, updatePayload)
@@ -122,13 +163,7 @@ export const stripeProvider: Provider = {
       }
       // カード情報の保存を有効化するかはフロントの saveCard フラグに従う
       // order.metadata.saveCard は 'true'/'false' 文字列または boolean の可能性がある
-      const saveCardFlag = (() => {
-        const v = (order.metadata as any)?.saveCard
-        if (v === undefined || v === null) return false
-        if (typeof v === 'boolean') return v
-        if (typeof v === 'string') return v.toLowerCase() === 'true'
-        return false
-      })()
+      const saveCardFlag = parseBooleanish(getMetadataValue(order.metadata, 'saveCard'))
       if (saveCardFlag) {
         sessionOptions.payment_intent_data = {
           setup_future_usage: 'off_session'
@@ -155,7 +190,7 @@ export const stripeProvider: Provider = {
         console.log('Stripe: 既存顧客を使用:', customerId)
         // 既存顧客の情報を最新化（住所・電話・氏名があれば更新）
         try {
-          const updatePayload: any = {}
+          const updatePayload: Stripe.CustomerUpdateParams = {}
           if (order.metadata?.userName || order.customerInfo?.name) updatePayload.name = order.metadata?.userName || order.customerInfo?.name
           if (order.customerInfo?.phone) updatePayload.phone = order.customerInfo.phone
           if (order.customerInfo?.address || order.customerInfo?.postalCode || order.customerInfo?.city || order.customerInfo?.state || order.customerInfo?.addressLine2) {
@@ -202,13 +237,7 @@ export const stripeProvider: Provider = {
       sessionOptions.customer = customerId
       // カード情報の保存を有効化するかはフロントの saveCard フラグに従う
       // order.metadata.saveCard は 'true'/'false' 文字列または boolean の可能性がある
-      const saveCardFlag = (() => {
-        const v = (order.metadata as any)?.saveCard
-        if (v === undefined || v === null) return false
-        if (typeof v === 'boolean') return v
-        if (typeof v === 'string') return v.toLowerCase() === 'true'
-        return false
-      })()
+      const saveCardFlag = parseBooleanish(getMetadataValue(order.metadata, 'saveCard'))
       if (saveCardFlag) {
         sessionOptions.payment_intent_data = {
           setup_future_usage: 'off_session'
@@ -285,25 +314,44 @@ export const stripeProvider: Provider = {
             if (!stripe) {
               throw new Error('Stripe client not initialized: missing STRIPE_SECRET_KEY or initialization failed')
             }
+            // We request expanded fields; define a local union type to help TypeScript understand shipping_details/payment_intent
+            type ExpandedCheckoutSession = Stripe.Checkout.Session & {
+              payment_intent?: Stripe.PaymentIntent | string | null
+              line_items?: Stripe.ApiList<Stripe.LineItem>
+              customer?: Stripe.Customer | string | null
+              shipping_details?: {
+                name?: string | null
+                phone?: string | null
+                address?: {
+                  line1?: string | null
+                  line2?: string | null
+                  postal_code?: string | null
+                  city?: string | null
+                  state?: string | null
+                  country?: string | null
+                } | null
+              } | null
+            }
+
             const session = await stripe.checkout.sessions.retrieve(sessionId, {
               expand: ['payment_intent', 'line_items', 'customer']
-            })
+            }) as ExpandedCheckoutSession
 
             // 顧客情報を取得（優先順位: session.customer_details -> Stripe Customer オブジェクト -> expanded session.customer）
             let customerDetails: any = session.customer_details
             // Try to fetch full customer from Stripe if session.customer is present
             if ((!customerDetails || !customerDetails.name || !customerDetails.phone) && session.customer) {
               try {
-                const custId = typeof session.customer === 'string' ? session.customer : (session.customer as any).id
+                const custId = extractCustomerIdFromSessionCustomer(session.customer)
                 if (custId && stripe) {
                   const fullCustomer = await stripe.customers.retrieve(custId)
-                  if (fullCustomer) {
+                  if (fullCustomer && typeof fullCustomer === 'object') {
                     customerDetails = customerDetails || {}
                     // prefer explicit fields from fullCustomer when available
-                    customerDetails.name = customerDetails.name || (fullCustomer as any).name
-                    customerDetails.email = customerDetails.email || (fullCustomer as any).email
-                    customerDetails.phone = customerDetails.phone || (fullCustomer as any).phone
-                    customerDetails.address = customerDetails.address || (fullCustomer as any).address
+                    customerDetails.name = customerDetails.name || (fullCustomer as Stripe.Customer).name || undefined
+                    customerDetails.email = customerDetails.email || (fullCustomer as Stripe.Customer).email || undefined
+                    customerDetails.phone = customerDetails.phone || (fullCustomer as Stripe.Customer).phone || undefined
+                    customerDetails.address = customerDetails.address || (fullCustomer as Stripe.Customer).address || undefined
                   }
                 }
               } catch (custErr) {
@@ -313,8 +361,8 @@ export const stripeProvider: Provider = {
 
             // Stripe Customer IDをUserテーブルに保存（email が判明している場合）
             const custIdForUserRaw = session.customer
-            const custIdForUser = typeof custIdForUserRaw === 'string' ? custIdForUserRaw : (custIdForUserRaw && (custIdForUserRaw as any).id ? (custIdForUserRaw as any).id : undefined)
-            const custEmailForUser = customerDetails?.email || (session.customer && typeof session.customer === 'object' ? (session.customer as any).email : undefined)
+            const custIdForUser = extractCustomerIdFromSessionCustomer(custIdForUserRaw)
+            const custEmailForUser = customerDetails?.email || (session.customer && typeof session.customer === 'object' ? (session.customer as Stripe.Customer).email : undefined)
             if (custIdForUser && custEmailForUser) {
               try {
                 const existingUser = await tx.user.findUnique({ where: { email: custEmailForUser } })
@@ -349,25 +397,28 @@ export const stripeProvider: Provider = {
             }
 
             // Stripe顧客情報をCheckout画面の配送先で上書き
-            const sessionAny = session as any;
-            if (session.customer && sessionAny.shipping_details && sessionAny.shipping_details.address) {
+            // shipping_details may be present on the expanded session
+            const sessionShippingDetails = (session as ExpandedCheckoutSession).shipping_details
+            if (session.customer && sessionShippingDetails && sessionShippingDetails.address) {
               try {
-                const custId = typeof session.customer === 'string' ? session.customer : (session.customer as any).id
-                const shippingAddr = sessionAny.shipping_details.address
-                const updatePayload: any = {
-                  address: {
-                    line1: shippingAddr.line1 || '',
-                    line2: shippingAddr.line2 || '',
-                    postal_code: shippingAddr.postal_code || '',
-                    city: shippingAddr.city || '',
-                    state: shippingAddr.state || '',
-                    country: shippingAddr.country || 'JP'
+                const custId = extractCustomerIdFromSessionCustomer(session.customer)
+                if (custId) {
+                  const shippingAddr = sessionShippingDetails.address
+                  const updatePayload: Stripe.CustomerUpdateParams = {
+                    address: {
+                      line1: shippingAddr.line1 || undefined,
+                      line2: shippingAddr.line2 || undefined,
+                      postal_code: shippingAddr.postal_code || undefined,
+                      city: shippingAddr.city || undefined,
+                      state: shippingAddr.state || undefined,
+                      country: shippingAddr.country || 'JP'
+                    }
                   }
+                  if (sessionShippingDetails.name) updatePayload.name = sessionShippingDetails.name
+                  if (sessionShippingDetails.phone) updatePayload.phone = sessionShippingDetails.phone
+                  await stripe.customers.update(custId, updatePayload)
+                  console.log('[stripe] 顧客情報をCheckout配送先で上書き:', custId, updatePayload)
                 }
-                if (sessionAny.shipping_details.name) updatePayload.name = sessionAny.shipping_details.name
-                if (sessionAny.shipping_details.phone) updatePayload.phone = sessionAny.shipping_details.phone
-                await stripe.customers.update(custId, updatePayload)
-                console.log('[stripe] 顧客情報をCheckout配送先で上書き:', custId, updatePayload)
               } catch (err) {
                 console.warn('[stripe] 顧客情報の配送先上書き失敗:', err)
               }
@@ -377,17 +428,17 @@ export const stripeProvider: Provider = {
             const shippingCost = session.shipping_cost?.amount_total || 0
 
             // payment_intent は expand しているためオブジェクト／文字列どちらの可能性もある
-            const paymentIntentRaw: any = session.payment_intent
+            const paymentIntentRaw: unknown = session.payment_intent
             let paymentIntentId: string | undefined = undefined
             if (paymentIntentRaw) {
               if (typeof paymentIntentRaw === 'string') paymentIntentId = paymentIntentRaw
-              else if (paymentIntentRaw.id) paymentIntentId = paymentIntentRaw.id
+              else if (typeof paymentIntentRaw === 'object' && paymentIntentRaw !== null && 'id' in paymentIntentRaw) paymentIntentId = (paymentIntentRaw as any).id
               else paymentIntentId = String(paymentIntentRaw)
             }
             console.log('[stripe] payment_intent raw type:', typeof paymentIntentRaw, 'value:', paymentIntentRaw, 'resolved id:', paymentIntentId)
 
             // 既存注文IDがセッションのmetadataにあれば、その注文を paid に更新して使う
-            let order = null as any
+            let order: { id: string } | null = null
             const existingOrderId = session.metadata?.orderId || payload?.data?.object?.metadata?.orderId
             if (existingOrderId) {
               try {
@@ -400,9 +451,9 @@ export const stripeProvider: Provider = {
                       totalAmount: session.amount_total || found.totalAmount,
                       subtotal: (session.amount_total || found.totalAmount) - shippingCost,
                       shippingFee: shippingCost,
-                      customerEmail: customerDetails?.email || (session.customer && typeof session.customer === 'object' ? (session.customer as any).email : found.customerEmail),
-                      customerName: customerDetails?.name || (session.customer && typeof session.customer === 'object' ? (session.customer as any).name : found.customerName),
-                      customerPhone: customerDetails?.phone || (session.customer && typeof session.customer === 'object' ? (session.customer as any).phone : found.customerPhone),
+                      customerEmail: customerDetails?.email || (session.customer && typeof session.customer === 'object' ? (session.customer as Stripe.Customer).email : found.customerEmail),
+                      customerName: customerDetails?.name || (session.customer && typeof session.customer === 'object' ? (session.customer as Stripe.Customer).name : found.customerName),
+                      customerPhone: customerDetails?.phone || (session.customer && typeof session.customer === 'object' ? (session.customer as Stripe.Customer).phone : found.customerPhone),
                       shippingAddress: shippingAddress,
                       notes: `Stripe Session ID: ${sessionId}`
                     }
@@ -421,9 +472,9 @@ export const stripeProvider: Provider = {
                   totalAmount: session.amount_total || 0,
                   currency: session.currency || 'jpy',
                   status: 'paid',
-                  customerEmail: customerDetails?.email || (session.customer && typeof session.customer === 'object' ? (session.customer as any).email : ''),
-                  customerName: customerDetails?.name || (session.customer && typeof session.customer === 'object' ? (session.customer as any).name : ''),
-                  customerPhone: customerDetails?.phone || (session.customer && typeof session.customer === 'object' ? (session.customer as any).phone : ''),
+                  customerEmail: customerDetails?.email || (session.customer && typeof session.customer === 'object' ? (session.customer as Stripe.Customer).email : ''),
+                  customerName: customerDetails?.name || (session.customer && typeof session.customer === 'object' ? (session.customer as Stripe.Customer).name : ''),
+                  customerPhone: customerDetails?.phone || (session.customer && typeof session.customer === 'object' ? (session.customer as Stripe.Customer).phone : ''),
                   shippingAddress: shippingAddress,
                   subtotal: (session.amount_total || 0) - shippingCost,
                   shippingFee: shippingCost,
@@ -438,14 +489,15 @@ export const stripeProvider: Provider = {
             let resolvedStripeId: string | undefined = paymentIntentId
             try {
               if (!resolvedStripeId) {
-                const piRaw: any = session.payment_intent
-                if (piRaw) {
-                  const latestCharge = piRaw.latest_charge || (piRaw.charges && piRaw.charges.data && piRaw.charges.data[0])
+                const piRaw: unknown = session.payment_intent
+                if (piRaw && typeof piRaw === 'object') {
+                  // latest_charge / charges shape may vary; access safely
+                  const latestCharge = (piRaw as any).latest_charge || ((piRaw as any).charges && (piRaw as any).charges.data && (piRaw as any).charges.data[0])
                   if (latestCharge) {
                     if (typeof latestCharge === 'string') resolvedStripeId = latestCharge
-                    else if (latestCharge.id) resolvedStripeId = latestCharge.id
+                    else if (latestCharge && typeof latestCharge === 'object' && 'id' in latestCharge) resolvedStripeId = (latestCharge as any).id
                   }
-                  if (!resolvedStripeId && piRaw.id) resolvedStripeId = piRaw.id
+                  if (!resolvedStripeId && 'id' in (piRaw as any)) resolvedStripeId = (piRaw as any).id
                 }
               }
             } catch (resolveErr) {
