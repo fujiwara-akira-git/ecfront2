@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcryptjs from 'bcryptjs'
+import type { Prisma } from '@prisma/client'
 
 export async function POST(request: NextRequest) {
   try {
@@ -66,21 +67,21 @@ export async function POST(request: NextRequest) {
     // パスワードをハッシュ化
     const hashedPassword = await bcryptjs.hash(password, 10)
 
-    // データベースにユーザーを保存
+    // データベースにユーザーを保存（型安全な構築）
+    const userData: Prisma.UserCreateInput = {
+      name,
+      email,
+      password: hashedPassword,
+      phone,
+      address,
+      postalCode,
+      state,
+      city,
+      userType,
+    }
+
     const newUser = await prisma.user.create({
-      // Prisma generated types may be strict; use a typed cast here to allow
-      // our camelCase `postalCode` field which matches the Prisma schema.
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-        phone,
-        address,
-        postalCode,
-        state,
-        city,
-        userType,
-      } as any,
+      data: userData,
       select: {
         id: true,
         name: true,

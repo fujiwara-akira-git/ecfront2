@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
+import type { Session } from 'next-auth'
 
 export interface CartItem {
   id: string
@@ -114,7 +115,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     lastSyncTime: 0 
   })
   const { data: session, status } = useSession()
-  const sessionUserId = (session as any)?.user?.id as string | undefined
+  const typedSession = session as Session | null | undefined
+  const sessionUserId = typedSession?.user?.id as string | undefined
   const hasInitialized = useRef(false)
   const syncInProgress = useRef(false)
 
@@ -222,11 +224,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ローカルストレージからカートデータを読み込む（未ログイン時）
   useEffect(() => {
-    if (sessionUserId && hasInitialized.current && state.items.length > 0 && state.lastSyncTime === 0) {
+    if (sessionUserId && state.items.length > 0 && state.lastSyncTime === 0 && hasInitialized.current) {
       console.log('🔁 ログイン後state.items変化でマイグレーション実行:', state.items.length, '件')
       migrateLocalCartToDatabase()
     }
-  }, [sessionUserId, hasInitialized.current, state.items.length, state.lastSyncTime, migrateLocalCartToDatabase])
+  }, [sessionUserId, state.items.length, state.lastSyncTime, migrateLocalCartToDatabase])
 
   useEffect(() => {
     if (status === 'loading') return
@@ -330,7 +332,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // デバッグ用: グローバルスコープに関数を公開（開発環境のみ）
   useEffect(() => {
     if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
-      const w = window as any
+      // Extend window for debug helpers in development safely
+      const w = window as Window & Record<string, any>
       w.clearCart = clearLocalCart
       w.showCart = () => {
         console.log('🛒 現在のカート:', state.items)

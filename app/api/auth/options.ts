@@ -1,5 +1,6 @@
 import CredentialsProvider from 'next-auth/providers/credentials'
 import type { NextAuthOptions } from 'next-auth'
+import type { JWT } from 'next-auth/jwt'
 import { prisma } from '@/lib/prisma'
 import bcryptjs from 'bcryptjs'
 
@@ -20,31 +21,23 @@ export const authOptions: NextAuthOptions = {
 
         try {
           // データベースからユーザーを検索
-          const user = await prisma.user.findUnique({
-            where: { 
-              email
-            }
-          }) as any
+          const user = await prisma.user.findUnique({ where: { email } })
 
-          if (!user || !user.password) {
-            return null
-          }
+          if (!user || !user.password) return null
 
           // パスワードを検証
           const isValidPassword = await bcryptjs.compare(password, user.password)
-
-          if (!isValidPassword) {
-            return null
-          }
+          if (!isValidPassword) return null
 
           // データベースのuserTypeフィールドに基づいてロールを決定
-          const role = user.userType.toUpperCase()
+          const role = (user.userType || 'customer').toUpperCase()
 
+          // NextAuth の user オブジェクトとして返す形を明示
           return {
             id: user.id,
-            email: user.email!,
+            email: user.email ?? undefined,
             name: user.name || 'Unknown User',
-            role: role
+            role,
           }
         } catch (error) {
           console.error('認証エラー:', error)
@@ -63,17 +56,23 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user }) {
+      // token を拡張して role を保持する
+      const extended = token as JWT & { role?: string }
       if (user && 'role' in user) {
-        const t = token as any
-        t.role = (user as any).role
+        extended.role = (user as { role?: string }).role
       }
-      return token
+      return extended
     },
     async session({ session, token }) {
-      if (token && session?.user) {
-        const s = session.user as any
-        s.id = token.sub!
-        s.role = (token as any).role as string
+      // session.user に id と role を安全に付与して返す
+      const extendedToken = token as JWT & { role?: string }
+      if (session?.user) {
+        const userWithExtras = {
+          ...session.user,
+          id: token.sub ?? undefined,
+          role: extendedToken.role ?? undefined,
+        }
+        return { ...session, user: userWithExtras }
       }
       return session
     }
