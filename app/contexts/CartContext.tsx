@@ -116,7 +116,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   })
   const { data: session, status } = useSession()
   const typedSession = session as Session | null | undefined
-  const sessionUserId = typedSession?.user?.id as string | undefined
+  const sessionUserId = typeof typedSession?.user?.id === 'string' ? typedSession.user.id : undefined
   const hasInitialized = useRef(false)
   const syncInProgress = useRef(false)
 
