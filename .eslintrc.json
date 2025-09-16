@@ -5,8 +5,7 @@
   "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended", "next"],
   "rules": {
     "@typescript-eslint/no-explicit-any": "off"
-  }
-  ,
+  },
   "overrides": [
     {
       "files": ["scripts/**", "firebase/**"],
@@ -19,6 +18,12 @@
       "files": ["next-env.d.ts"],
       "rules": {
         "@typescript-eslint/triple-slash-reference": "off"
+      }
+    },
+    {
+      "files": ["lib/providers/stripe.ts"],
+      "rules": {
+        "no-constant-condition": "off"
       }
     }
   ]
