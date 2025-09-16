@@ -494,10 +494,22 @@ export const stripeProvider: Provider = {
               session = await stripe.checkout.sessions.retrieve(sessionId, {
                 expand: ['payment_intent', 'line_items', 'customer']
               }) as ExpandedCheckoutSession
+              console.log('[stripe] successfully retrieved session:', sessionId, {
+                amount_total: session.amount_total,
+                currency: session.currency,
+                payment_status: session.payment_status,
+                status: session.status
+              })
             } catch (retrieveErr: any) {
               const isResourceMissing = retrieveErr && (retrieveErr.code === 'resource_missing' || retrieveErr?.raw?.code === 'resource_missing' || retrieveErr?.statusCode === 404)
               if (isResourceMissing) {
                 console.warn('[stripe] checkout.session not found on Stripe for id (fixture or deleted):', sessionId)
+                console.warn('[stripe] retrieve error details:', {
+                  code: retrieveErr?.code,
+                  message: retrieveErr?.message,
+                  statusCode: retrieveErr?.statusCode,
+                  type: retrieveErr?.type
+                })
                 try {
                   await prisma.stripeEvent.upsert({
                     where: { id: payload.id },
@@ -509,6 +521,11 @@ export const stripeProvider: Provider = {
                 }
                 return
               }
+              console.error('[stripe] failed to retrieve checkout session:', sessionId, {
+                error: retrieveErr?.message,
+                code: retrieveErr?.code,
+                statusCode: retrieveErr?.statusCode
+              })
               throw retrieveErr
             }
             stripeDebug('expanded session retrieved: id=', session.id, 'customer_details=', session.customer_details ? Object.keys(session.customer_details).slice(0,10) : undefined)
