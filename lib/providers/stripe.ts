@@ -660,14 +660,18 @@ export const stripeProvider: Provider = {
 
             // 見つからなければ新規作成
             if (!order) {
+              let finalCustomerEmail: string = ''
+              let finalCustomerName: string = ''
+              let finalCustomerPhone: string = ''
+
               try {
-                const finalCustomerEmail = getStringFromRecord(customerDetails, 'email') || extractCustomerEmail(session.customer) || ''
+                finalCustomerEmail = getStringFromRecord(customerDetails, 'email') || extractCustomerEmail(session.customer) || ''
                 const cdName = getStringFromRecord(customerDetails, 'name')
                 const sessionName = (session.customer && typeof session.customer === 'object' && typeof (session.customer as Stripe.Customer).name === 'string') ? (session.customer as Stripe.Customer).name : undefined
-                const finalCustomerName: string = cdName ?? sessionName ?? ''
+                finalCustomerName = cdName ?? sessionName ?? ''
                 const cdPhone = getStringFromRecord(customerDetails, 'phone')
                 const sessionPhone = (session.customer && typeof session.customer === 'object' && typeof (session.customer as Stripe.Customer).phone === 'string') ? (session.customer as Stripe.Customer).phone : undefined
-                const finalCustomerPhone: string = cdPhone ?? sessionPhone ?? ''
+                finalCustomerPhone = cdPhone ?? sessionPhone ?? ''
 
                 order = await withRetries(() => prisma.order.create({
                   data: {
