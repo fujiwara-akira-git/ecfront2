@@ -38,7 +38,20 @@ async function withRetries<T>(fn: () => Promise<T>, attempts = 3, baseDelay = 20
     } catch (err: any) {
       attempt++
       const transient = isTransientPrismaError(err)
+      console.log(`[stripe][retry] attempt ${attempt}/${attempts}, transient=${transient}, error:`, {
+        code: err?.code,
+        message: err?.message,
+        meta: err?.meta,
+        timestamp: new Date().toISOString()
+      })
+
       if (!transient || attempt >= attempts) {
+        console.error(`[stripe][retry] final failure after ${attempt} attempts:`, {
+          code: err?.code,
+          message: err?.message,
+          stack: err?.stack,
+          timestamp: new Date().toISOString()
+        })
         throw err
       }
       const delay = baseDelay * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 100)
@@ -394,7 +407,11 @@ export const stripeProvider: Provider = {
   },
 
   async handleWebhookEvent(payload: any) {
-    console.log('stripe webhook event received:', payload?.type || '(no type)')
+    console.log('stripe webhook event received:', payload?.type || '(no type)', {
+      eventId: payload?.id,
+      timestamp: new Date().toISOString(),
+      databaseUrl: process.env.DATABASE_URL ? 'configured' : 'missing'
+    })
     stripeDebug('raw payload keys:', payload && typeof payload === 'object' ? Object.keys(payload).slice(0,10) : String(payload))
 
     if (!payload?.id || !payload?.type) {
@@ -403,6 +420,20 @@ export const stripeProvider: Provider = {
     }
 
     try {
+      // データベース接続テスト
+      console.log('[stripe] testing database connection...')
+      try {
+        await prisma.$queryRaw`SELECT 1`
+        console.log('[stripe] database connection OK')
+      } catch (dbTestErr: any) {
+        console.error('[stripe] database connection test failed:', {
+          code: dbTestErr?.code,
+          message: dbTestErr?.message,
+          timestamp: new Date().toISOString()
+        })
+        throw new Error(`Database connection failed: ${dbTestErr?.message}`)
+      }
+
       // 1) 最初に upsert でイベントを登録または保持する（冪等性確保）
       // upsert は競合回避に有用で、同一イベントの複数同時配信でも安全に動作します。
       try {
@@ -658,8 +689,17 @@ export const stripeProvider: Provider = {
                   sessionId,
                   existingOrderId: existingOrderId,
                   paymentIntentId,
+                  sessionAmount: session.amount_total,
+                  sessionCurrency: session.currency,
+                  customerEmail: finalCustomerEmail || 'undefined',
+                  customerName: finalCustomerName || 'undefined',
+                  customerPhone: finalCustomerPhone || 'undefined',
+                  shippingAddress: shippingAddress,
+                  errCode: orderCreateErr?.code,
                   errMessage: orderCreateErr?.message,
-                  errStack: orderCreateErr?.stack
+                  errMeta: orderCreateErr?.meta,
+                  errStack: orderCreateErr?.stack,
+                  timestamp: new Date().toISOString()
                 })
                 throw orderCreateErr
               }
@@ -697,7 +737,8 @@ export const stripeProvider: Provider = {
                 shippingAddress: shippingAddress,
                 orderId: order.id,
                 paymentId: payment.id,
-                stripeId: payment.stripeId
+                stripeId: payment.stripeId,
+                timestamp: new Date().toISOString()
               })
             } catch (paymentCreateErr: any) {
               console.error('[stripe][webhook][payment-create] error creating payment', {
@@ -706,8 +747,14 @@ export const stripeProvider: Provider = {
                 existingOrderId: existingOrderId,
                 paymentIntentId,
                 resolvedStripeId,
+                orderId: order?.id,
+                sessionAmount: session.amount_total,
+                sessionCurrency: session.currency,
+                errCode: paymentCreateErr?.code,
                 errMessage: paymentCreateErr?.message,
-                errStack: paymentCreateErr?.stack
+                errMeta: paymentCreateErr?.meta,
+                errStack: paymentCreateErr?.stack,
+                timestamp: new Date().toISOString()
               })
               throw paymentCreateErr
             }
