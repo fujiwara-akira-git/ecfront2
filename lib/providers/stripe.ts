@@ -16,6 +16,38 @@ function stripeDebug(...args: unknown[]) {
   if (STRIPE_DEBUG) console.log('[stripe:debug]', ...args)
 }
 
+// Simple retry helper for transient DB/network errors
+function isTransientPrismaError(err: any): boolean {
+  if (!err) return false
+  const code = err.code || ''
+  const msg = (err.message || '').toString()
+  // Common transient errors: cannot reach DB, interactive transaction timeouts, unable to start transaction
+  if (code === 'P1001') return true
+  if (msg.includes('Transaction API error')) return true
+  if (msg.includes('Unable to start a transaction')) return true
+  if (msg.includes('Transaction already closed')) return true
+  if (msg.includes("Can't reach database server")) return true
+  return false
+}
+
+async function withRetries<T>(fn: () => Promise<T>, attempts = 3, baseDelay = 200): Promise<T> {
+  let attempt = 0
+  while (true) {
+    try {
+      return await fn()
+    } catch (err: any) {
+      attempt++
+      const transient = isTransientPrismaError(err)
+      if (!transient || attempt >= attempts) {
+        throw err
+      }
+      const delay = baseDelay * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 100)
+      console.warn(`[stripe][retry] transient error, attempt ${attempt}/${attempts}, retrying after ${delay}ms`, err?.message)
+      await new Promise((res) => setTimeout(res, delay))
+    }
+  }
+}
+
 // Helpers for safe metadata and value parsing
 function toStringMetadata(metadata?: Record<string, any>): Record<string, string> | undefined {
   if (!metadata) return undefined
@@ -371,33 +403,38 @@ export const stripeProvider: Provider = {
     }
 
     try {
-      // 冪等性チェック：既に処理済みのイベントは無視
-      const existing = await prisma.stripeEvent.findUnique({
-        where: { id: payload.id }
-      })
+      // 1) 最初に upsert でイベントを登録または保持する（冪等性確保）
+      // upsert は競合回避に有用で、同一イベントの複数同時配信でも安全に動作します。
+      try {
+        await prisma.stripeEvent.upsert({
+          where: { id: payload.id },
+          create: { id: payload.id, type: payload.type, payload: payload, processed: false },
+          update: { payload: payload }
+        })
+      } catch (upsertErr: any) {
+        // upsert が P2002 (unique constraint) を投げることは通常ないが、
+        // 競合や並列処理のタイミングによって発生し得るため、
+        // 明示的に無害化して続行する。
+        const isP2002 = upsertErr && upsertErr.code === 'P2002'
+        if (isP2002) {
+          console.warn('[stripe] stripeEvent upsert race/duplicate (P2002) - ignoring:', payload.id)
+        } else {
+          console.warn('[stripe] stripeEvent upsert warning:', upsertErr)
+        }
+      }
 
-      if (existing) {
-        console.log('[stripe] event already processed:', payload.id)
+      // 再チェック：もし既に processed=true なら二重処理を避ける
+      const existing = await prisma.stripeEvent.findUnique({ where: { id: payload.id } })
+      if (existing && existing.processed) {
+        console.log('[stripe] event already processed (skip):', payload.id)
         return
       }
 
-      // トランザクションで処理
-      await prisma.$transaction(async (tx) => {
-        // 1. Stripe イベントを保存
-        await tx.stripeEvent.create({
-          data: {
-            id: payload.id,
-            type: payload.type,
-            payload: payload,
-            processed: false
-          }
-        })
-
-        // 2. checkout.session.completed の場合は注文とペイメントを作成
-        if (payload.type === 'checkout.session.completed') {
+      // 2) checkout.session.completed の場合は注文とペイメントを作成
+      if (payload.type === 'checkout.session.completed') {
           const sessionId = payload?.data?.object?.id
           stripeDebug('checkout.session.completed payload.data.object keys:', payload?.data?.object && typeof payload.data.object === 'object' ? Object.keys(payload.data.object).slice(0,20) : String(payload?.data?.object))
-          if (sessionId) {
+            if (sessionId) {
             // Stripe から詳細セッション情報を取得
             if (!stripe) {
               throw new Error('Stripe client not initialized: missing STRIPE_SECRET_KEY or initialization failed')
@@ -421,9 +458,28 @@ export const stripeProvider: Provider = {
               } | null
             }
 
-            const session = await stripe.checkout.sessions.retrieve(sessionId, {
-              expand: ['payment_intent', 'line_items', 'customer']
-            }) as ExpandedCheckoutSession
+            let session: ExpandedCheckoutSession | null = null
+            try {
+              session = await stripe.checkout.sessions.retrieve(sessionId, {
+                expand: ['payment_intent', 'line_items', 'customer']
+              }) as ExpandedCheckoutSession
+            } catch (retrieveErr: any) {
+              const isResourceMissing = retrieveErr && (retrieveErr.code === 'resource_missing' || retrieveErr?.raw?.code === 'resource_missing' || retrieveErr?.statusCode === 404)
+              if (isResourceMissing) {
+                console.warn('[stripe] checkout.session not found on Stripe for id (fixture or deleted):', sessionId)
+                try {
+                  await prisma.stripeEvent.upsert({
+                    where: { id: payload.id },
+                    create: { id: payload.id, type: payload.type, payload: payload, processed: true, processedAt: new Date() },
+                    update: { processed: true, processedAt: new Date() }
+                  })
+                } catch (e) {
+                  console.warn('[stripe] marking event processed failed:', e)
+                }
+                return
+              }
+              throw retrieveErr
+            }
             stripeDebug('expanded session retrieved: id=', session.id, 'customer_details=', session.customer_details ? Object.keys(session.customer_details).slice(0,10) : undefined)
             stripeDebug('session.shipping_details keys=', session.shipping_details ? Object.keys(session.shipping_details as any) : undefined)
             stripeDebug('session.payment_intent (type) =', typeof session.payment_intent)
@@ -467,13 +523,13 @@ export const stripeProvider: Provider = {
             stripeDebug('resolved customer for user:', { custIdForUser, custEmailForUser })
             if (custIdForUser && custEmailForUser) {
               try {
-                const existingUser = await tx.user.findUnique({ where: { email: custEmailForUser } })
+                const existingUser = await prisma.user.findUnique({ where: { email: custEmailForUser } })
                 if (existingUser) {
                   const updateData: any = { stripeCustomerId: custIdForUser }
-                  await tx.user.update({
+                  await withRetries(() => prisma.user.update({
                     where: { email: custEmailForUser },
                     data: updateData
-                  })
+                  }))
                   console.log('[stripe] saved customer ID for user:', custEmailForUser, custIdForUser)
                 } else {
                   console.log('[stripe] user not found, skipping user update for email:', custEmailForUser)
@@ -539,7 +595,7 @@ export const stripeProvider: Provider = {
             const existingOrderId = session.metadata?.orderId || payload?.data?.object?.metadata?.orderId
             if (existingOrderId) {
               try {
-                const found = await tx.order.findUnique({ where: { id: existingOrderId } })
+                const found = await prisma.order.findUnique({ where: { id: existingOrderId } })
                 if (found) {
                   const finalCustomerEmail = getStringFromRecord(customerDetails, 'email') || extractCustomerEmail(session.customer) || found.customerEmail
                   const cdName = getStringFromRecord(customerDetails, 'name')
@@ -550,8 +606,7 @@ export const stripeProvider: Provider = {
                   const sessionPhone = (session.customer && typeof session.customer === 'object' && typeof (session.customer as Stripe.Customer).phone === 'string') ? (session.customer as Stripe.Customer).phone : undefined
                   const dbPhone = found.customerPhone ?? ''
                   const finalCustomerPhone: string = cdPhone ?? sessionPhone ?? dbPhone
-
-                  order = await tx.order.update({
+                  order = await withRetries(() => prisma.order.update({
                     where: { id: existingOrderId },
                     data: {
                       status: 'paid',
@@ -564,7 +619,7 @@ export const stripeProvider: Provider = {
                       shippingAddress: shippingAddress,
                       notes: `Stripe Session ID: ${sessionId}`
                     }
-                  })
+                  }))
                   console.log('[stripe] updated existing order to paid:', existingOrderId)
                 }
               } catch (err) {
@@ -574,28 +629,40 @@ export const stripeProvider: Provider = {
 
             // 見つからなければ新規作成
             if (!order) {
-              const finalCustomerEmail = getStringFromRecord(customerDetails, 'email') || extractCustomerEmail(session.customer) || ''
-              const cdName = getStringFromRecord(customerDetails, 'name')
-              const sessionName = (session.customer && typeof session.customer === 'object' && typeof (session.customer as Stripe.Customer).name === 'string') ? (session.customer as Stripe.Customer).name : undefined
-              const finalCustomerName: string = cdName ?? sessionName ?? ''
-              const cdPhone = getStringFromRecord(customerDetails, 'phone')
-              const sessionPhone = (session.customer && typeof session.customer === 'object' && typeof (session.customer as Stripe.Customer).phone === 'string') ? (session.customer as Stripe.Customer).phone : undefined
-              const finalCustomerPhone: string = cdPhone ?? sessionPhone ?? ''
+              try {
+                const finalCustomerEmail = getStringFromRecord(customerDetails, 'email') || extractCustomerEmail(session.customer) || ''
+                const cdName = getStringFromRecord(customerDetails, 'name')
+                const sessionName = (session.customer && typeof session.customer === 'object' && typeof (session.customer as Stripe.Customer).name === 'string') ? (session.customer as Stripe.Customer).name : undefined
+                const finalCustomerName: string = cdName ?? sessionName ?? ''
+                const cdPhone = getStringFromRecord(customerDetails, 'phone')
+                const sessionPhone = (session.customer && typeof session.customer === 'object' && typeof (session.customer as Stripe.Customer).phone === 'string') ? (session.customer as Stripe.Customer).phone : undefined
+                const finalCustomerPhone: string = cdPhone ?? sessionPhone ?? ''
 
-              order = await tx.order.create({
-                data: {
-                  totalAmount: session.amount_total || 0,
-                  currency: session.currency || 'jpy',
-                  status: 'paid',
-                  customerEmail: finalCustomerEmail,
-                  customerName: finalCustomerName,
-                  customerPhone: finalCustomerPhone,
-                  shippingAddress: shippingAddress,
-                  subtotal: (session.amount_total || 0) - shippingCost,
-                  shippingFee: shippingCost,
-                  notes: `Stripe Session ID: ${sessionId}`
-                }
-              })
+                order = await withRetries(() => prisma.order.create({
+                  data: {
+                    totalAmount: session.amount_total || 0,
+                    currency: session.currency || 'jpy',
+                    status: 'paid',
+                    customerEmail: finalCustomerEmail,
+                    customerName: finalCustomerName,
+                    customerPhone: finalCustomerPhone,
+                    shippingAddress: shippingAddress,
+                    subtotal: (session.amount_total || 0) - shippingCost,
+                    shippingFee: shippingCost,
+                    notes: `Stripe Session ID: ${sessionId}`
+                  }
+                }))
+              } catch (orderCreateErr: any) {
+                console.error('[stripe][webhook][order-create] error creating order', {
+                  eventId: payload.id,
+                  sessionId,
+                  existingOrderId: existingOrderId,
+                  paymentIntentId,
+                  errMessage: orderCreateErr?.message,
+                  errStack: orderCreateErr?.stack
+                })
+                throw orderCreateErr
+              }
             }
 
             // ペイメントを作成（paymentIntentId を正しく保存）
@@ -613,34 +680,56 @@ export const stripeProvider: Provider = {
               console.warn('[stripe] could not resolve stripe id from session/payment_intent:', resolveErr)
             }
 
-            await tx.payment.create({
-              data: {
+            try {
+              const payment = await withRetries(() => prisma.payment.create({
+                data: {
+                  orderId: order.id,
+                  stripeId: resolvedStripeId || undefined,
+                  amount: session.amount_total || 0,
+                  currency: session.currency || 'jpy',
+                  status: 'succeeded'
+                }
+              }))
+              console.log('[stripe] created order and payment for session:', sessionId, {
+                customerEmail: customerDetails?.email,
+                customerName: customerDetails?.name,
+                customerPhone: customerDetails?.phone,
+                shippingAddress: shippingAddress,
                 orderId: order.id,
-                stripeId: resolvedStripeId || undefined,
-                amount: session.amount_total || 0,
-                currency: session.currency || 'jpy',
-                status: 'succeeded'
-              }
-            })
-
-            console.log('[stripe] created order and payment for session:', sessionId, {
-              customerEmail: customerDetails?.email,
-              customerName: customerDetails?.name,
-              customerPhone: customerDetails?.phone,
-              shippingAddress: shippingAddress
-            })
+                paymentId: payment.id,
+                stripeId: payment.stripeId
+              })
+            } catch (paymentCreateErr: any) {
+              console.error('[stripe][webhook][payment-create] error creating payment', {
+                eventId: payload.id,
+                sessionId,
+                existingOrderId: existingOrderId,
+                paymentIntentId,
+                resolvedStripeId,
+                errMessage: paymentCreateErr?.message,
+                errStack: paymentCreateErr?.stack
+              })
+              throw paymentCreateErr
+            }
           }
         }
 
-        // 3. イベントを処理済みに更新
-        await tx.stripeEvent.update({
-          where: { id: payload.id },
-          data: { 
-            processed: true,
-            processedAt: new Date()
+        // 3. イベントを処理済みに更新（upsert で確実に存在を担保）
+        try {
+          await withRetries(() => prisma.stripeEvent.upsert({
+            where: { id: payload.id },
+            create: { id: payload.id, type: payload.type, payload: payload, processed: true, processedAt: new Date() },
+            update: { processed: true, processedAt: new Date() }
+          }))
+        } catch (e: any) {
+          // 最終マークでも P2002 が発生し得る（並列処理や別プロセスの影響）。
+          // P2002 は既に存在することを示すので無害化する。
+          if (e && e.code === 'P2002') {
+            console.warn('[stripe] final event upsert race/duplicate (P2002) - ignoring:', payload.id)
+          } else {
+            console.warn('[stripe] final event upsert failed:', e)
           }
-        })
-      })
+        }
 
       console.log('[stripe] successfully processed event:', payload.id)
     } catch (err) {

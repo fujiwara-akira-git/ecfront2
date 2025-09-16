@@ -16,8 +16,8 @@
     "db:migrate:prod": "NODE_ENV=production npx prisma migrate deploy",
     "db:generate": "npx prisma generate",
     "deploy:prod": "npm run build && vercel --prod",
-    "postinstall": "node ./scripts/prisma-postinstall.js"
-    ,"stripe:listen": "./scripts/stripe-listen.sh"
+    "postinstall": "node ./scripts/prisma-postinstall.js",
+    "stripe:listen": "./scripts/stripe-listen.sh"
   },
   "dependencies": {
     "@prisma/client": "^6.16.1",
@@ -25,6 +25,7 @@
     "bcryptjs": "^3.0.2",
     "next": "^15.5.3",
     "next-auth": "^4.24.11",
+    "pg": "^8.16.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "stripe": "^18.5.0",

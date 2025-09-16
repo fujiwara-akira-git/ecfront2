@@ -5,7 +5,7 @@ import type { Prisma } from '@prisma/client'
 
 export async function POST(request: NextRequest) {
   try {
-  const { name, email, password, phone, address, postalCode, state, city, userType = 'customer', adminCode } = await request.json()
+  const { name, email, password, phone, address, postalCode, userType = 'customer', adminCode } = await request.json()
 
     // バリデーション
     if (!name || !email || !password || !phone || !address || !postalCode) {
@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcryptjs.hash(password, 10)
 
     // データベースにユーザーを保存（型安全な構築）
+    // Prisma の User モデルに存在しないフィールド (state, city) は渡さない
     const userData: Prisma.UserCreateInput = {
       name,
       email,
@@ -75,8 +76,6 @@ export async function POST(request: NextRequest) {
       phone,
       address,
       postalCode,
-      state,
-      city,
       userType,
     }
 
@@ -94,12 +93,12 @@ export async function POST(request: NextRequest) {
     })
 
     console.log('新規ユーザー登録成功:', { 
-      id: newUser.id, 
-      name: newUser.name, 
-      email: newUser.email, 
-      address: newUser.address,
-      postalCode: newUser.postalCode,
-      userType: newUser.userType 
+  id: newUser.id,
+  name: newUser.name,
+  email: newUser.email,
+  address: newUser.address,
+  postalCode: newUser.postalCode,
+  userType: newUser.userType 
     })
 
     return NextResponse.json(

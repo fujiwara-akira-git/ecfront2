@@ -23,11 +23,22 @@ export const authOptions: NextAuthOptions = {
           // データベースからユーザーを検索
           const user = await prisma.user.findUnique({ where: { email } })
 
-          if (!user || !user.password) return null
+          console.log('[auth][authorize] lookup', { email, found: !!user, userId: user?.id ?? null, hasPassword: !!user?.password })
+
+          if (!user || !user.password) {
+            console.log('[auth][authorize] no user or no password hash, denying auth', { email })
+            return null
+          }
 
           // パスワードを検証
+          console.log('[auth][authorize] comparing password for user', { userId: user.id })
           const isValidPassword = await bcryptjs.compare(password, user.password)
-          if (!isValidPassword) return null
+          console.log('[auth][authorize] password compare result', { userId: user.id, isValidPassword })
+
+          if (!isValidPassword) {
+            console.log('[auth][authorize] invalid password, denying auth', { userId: user.id })
+            return null
+          }
 
           // データベースのuserTypeフィールドに基づいてロールを決定
           const role = (user.userType || 'customer').toUpperCase()
