@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useCart } from '../../contexts/CartContext'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 // useSearchParams avoided to prevent Suspense requirement
 
 interface UserInfo {
@@ -34,6 +34,53 @@ export default function CheckoutPage() {
   const [saveCard, setSaveCard] = useState(true)
   const [deliveryService, setDeliveryService] = useState(searchParams.get('deliveryService') || 'japanpost')
   const [shippingFee, setShippingFee] = useState(Number(searchParams.get('shippingFee')) || 800)
+  const [isCalculatingShipping, setIsCalculatingShipping] = useState(false)
+
+  // カートの総重量を計算（仮定: 各商品500g）
+  const calculateTotalWeight = useCallback(() => {
+    const defaultWeightPerItem = 500 // grams
+    return state.items.reduce((total, item) => total + (item.quantity * defaultWeightPerItem), 0)
+  }, [state.items])
+
+  // 配送料を計算
+  const calculateShippingFee = useCallback(async (service: string, address: string, postalCode: string) => {
+    if (!address.trim() || !postalCode.trim()) return
+
+    setIsCalculatingShipping(true)
+    try {
+      const weightGrams = calculateTotalWeight()
+      const response = await fetch('/api/delivery/rates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          origin: { postalCode: '100-0001', address: '東京都中央区' },
+          destination: { postalCode, address },
+          weightGrams
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const rates = data.rates || []
+        
+        // 指定されたサービスからレートを取得
+        const serviceRate = rates.find((rate: any) => rate.provider === service)
+        if (serviceRate) {
+          setShippingFee(serviceRate.amount)
+        } else if (rates.length > 0) {
+          // 該当サービスがない場合は最初のレートを使用
+          setShippingFee(rates[0].amount)
+        }
+      }
+    } catch (error) {
+      console.error('配送料計算エラー:', error)
+      // エラー時はデフォルト値を維持
+    } finally {
+      setIsCalculatingShipping(false)
+    }
+  }, [calculateTotalWeight])
 
   // ユーザー情報・クエリ値を初期値にセット
   useEffect(() => {
@@ -46,7 +93,8 @@ export default function CheckoutPage() {
 
       if (session?.user?.id) {
         try {
-          const response = await fetch('/api/user')
+          const userUrl = (typeof window !== 'undefined' && window.location?.origin) ? `${window.location.origin}/api/user` : '/api/user'
+          const response = await fetch(userUrl, { credentials: 'include' })
           if (response.ok) {
             const userData = await response.json()
             setUserInfo(userData)
@@ -56,6 +104,9 @@ export default function CheckoutPage() {
             setPostalCode(queryPostalCode || userData.postalCode || '')
             setDeliveryService(queryDeliveryService)
             setShippingFee(queryShippingFee)
+          } else {
+            const text = await response.text().catch(() => '')
+            console.warn('[checkout] /api/user returned non-ok', response.status, text)
           }
         } catch (error) {
           console.error('ユーザー情報取得エラー:', error)
@@ -72,6 +123,13 @@ export default function CheckoutPage() {
       fetchUserInfo()
     }
   }, [session, status, searchParams])
+
+  // 配送サービスまたは住所変更時に配送料を再計算
+  useEffect(() => {
+    if (shippingAddress && postalCode && deliveryService) {
+      calculateShippingFee(deliveryService, shippingAddress, postalCode)
+    }
+  }, [deliveryService, shippingAddress, postalCode, calculateShippingFee])
 
   // 未ログインの場合はログインページにリダイレクト
   useEffect(() => {
@@ -129,6 +187,7 @@ export default function CheckoutPage() {
           phoneNumber: phoneNumber,
           deliveryService: deliveryService,
           shippingFee: shippingFee.toString(),
+          weightGrams: calculateTotalWeight().toString(),
           saveCard: saveCard ? 'true' : 'false'
         }
       }
@@ -248,11 +307,15 @@ export default function CheckoutPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">送料（{deliveryService === 'yamato' ? 'ヤマト' : '日本郵便'}）</span>
-                <span>¥{shippingFee.toLocaleString()}</span>
+                <span>
+                  {isCalculatingShipping ? '計算中...' : `¥${shippingFee.toLocaleString()}`}
+                </span>
               </div>
               <div className="flex justify-between font-medium text-lg pt-2 border-t">
                 <span>合計</span>
-                <span>¥{total.toLocaleString()}</span>
+                <span>
+                  {isCalculatingShipping ? '計算中...' : `¥${total.toLocaleString()}`}
+                </span>
               </div>
             </div>
           </div>
@@ -336,6 +399,38 @@ export default function CheckoutPage() {
                 />
               </div>
 
+              {/* 配送サービス選択 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">配送サービス</label>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="deliveryService"
+                      value="yamato"
+                      checked={deliveryService === 'yamato'}
+                      onChange={(e) => setDeliveryService(e.target.value)}
+                      className="mr-2"
+                    />
+                    ヤマト運輸
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="radio"
+                      name="deliveryService"
+                      value="japanpost"
+                      checked={deliveryService === 'japanpost'}
+                      onChange={(e) => setDeliveryService(e.target.value)}
+                      className="mr-2"
+                    />
+                    日本郵便
+                  </label>
+                </div>
+                {isCalculatingShipping && (
+                  <p className="text-sm text-gray-500 mt-1">配送料を計算中...</p>
+                )}
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   支払い方法
@@ -371,10 +466,10 @@ export default function CheckoutPage() {
                 <button
                   type="button"
                   onClick={handlePayment}
-                  disabled={isLoading}
+                  disabled={isLoading || isCalculatingShipping}
                   className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-3 px-4 rounded-lg font-medium transition-colors"
                 >
-                  {isLoading ? '処理中...' : `¥${total.toLocaleString()} を支払う`}
+                  {isLoading ? '処理中...' : isCalculatingShipping ? '配送料計算中...' : `¥${total.toLocaleString()} を支払う`}
                 </button>
               </div>
             </form>

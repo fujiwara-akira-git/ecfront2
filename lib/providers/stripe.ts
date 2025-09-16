@@ -761,6 +761,74 @@ export const stripeProvider: Provider = {
                 stripeId: payment.stripeId,
                 timestamp: new Date().toISOString()
               })
+
+              // 決済完了後に配送を作成
+              try {
+                const deliveryService = session.metadata?.deliveryService || 'japanpost'
+                const weightGrams = parseInt(session.metadata?.weightGrams || '500')
+                const postalCode = session.metadata?.postalCode || ''
+
+                if (shippingAddress && postalCode) {
+                  console.log('[stripe] creating delivery for order:', order.id, {
+                    deliveryService,
+                    weightGrams,
+                    shippingAddress,
+                    postalCode
+                  })
+
+                  const deliveryResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/delivery/create`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      courierId: deliveryService,
+                      serviceCode: deliveryService === 'yamato' ? 'yamato_standard' : 'japanpost_standard',
+                      origin: {
+                        postalCode: '100-0001', // 仮定の発送元
+                        address: '東京都千代田区'
+                      },
+                      destination: {
+                        postalCode: postalCode,
+                        address: shippingAddress
+                      },
+                      packageInfo: {
+                        weightGrams: weightGrams,
+                        dimensions: {
+                          length: 30,
+                          width: 20,
+                          height: 10
+                        }
+                      },
+                      orderId: order.id
+                    })
+                  })
+
+                  if (deliveryResponse.ok) {
+                    const deliveryData = await deliveryResponse.json()
+                    console.log('[stripe] delivery created successfully:', deliveryData)
+
+                    // 注文に追跡番号を更新
+                    if (deliveryData.trackingNumber) {
+                      await withRetries(() => prisma.order.update({
+                        where: { id: order.id },
+                        data: {
+                          trackingNumber: deliveryData.trackingNumber,
+                          shippingMethod: deliveryService
+                        }
+                      }))
+                      console.log('[stripe] updated order with tracking number:', deliveryData.trackingNumber)
+                    }
+                  } else {
+                    console.error('[stripe] failed to create delivery:', await deliveryResponse.text())
+                  }
+                } else {
+                  console.warn('[stripe] missing shipping information for delivery creation')
+                }
+              } catch (deliveryError) {
+                console.error('[stripe] error creating delivery:', deliveryError)
+                // 配送作成失敗でも決済処理は成功として扱う
+              }
             } catch (paymentCreateErr: any) {
               console.error('[stripe][webhook][payment-create] error creating payment', {
                 eventId: payload.id,
