@@ -1,6 +1,7 @@
 import Stripe from 'stripe'
 import { Provider, OrderInput } from './provider'
 import { prisma } from '../prisma'
+import config from '../config'
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY || ''
 let stripe: Stripe | null = null
@@ -198,7 +199,7 @@ export const stripeProvider: Provider = {
     }
 
     // セッション作成のオプションを準備
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000').replace(/\/$/, '')
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || config.NEXTAUTH_URL || config.getBaseUrl()).replace(/\/$/, '')
 
     // customer/customer_emailは初期化時に含めない
     const sessionOptions: Stripe.Checkout.SessionCreateParams = {
@@ -776,7 +777,7 @@ export const stripeProvider: Provider = {
                     postalCode
                   })
 
-                  const deliveryResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/delivery/create`, {
+                  const deliveryResponse = await fetch(`${config.NEXTAUTH_URL || config.getBaseUrl()}/api/delivery/create`, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',

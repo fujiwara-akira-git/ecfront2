@@ -11,11 +11,13 @@ export type Product = {
 }
 
 // データベースから商品を取得する関数
+import config from '@/lib/config'
+
 export async function getProducts(): Promise<Product[]> {
   try {
     // サーバーサイドは絶対URL、クライアントサイドは相対URL
     const baseUrl = typeof window === 'undefined'
-      ? process.env.NEXTAUTH_URL || 'http://localhost:3000'
+      ? config.NEXTAUTH_URL || config.getBaseUrl()
       : ''
     const response = await fetch(`${baseUrl}/api/products`, {
       cache: 'no-store' // 常に最新データを取得
@@ -39,7 +41,7 @@ export async function getProduct(id: string): Promise<Product | null> {
   try {
     // サーバーサイドとクライアントサイドの両方に対応
     const baseUrl = typeof window === 'undefined' 
-      ? process.env.NEXTAUTH_URL || 'http://localhost:3000'
+      ? config.NEXTAUTH_URL || config.getBaseUrl()
       : ''
     
     const response = await fetch(`${baseUrl}/api/products/${id}`, {
