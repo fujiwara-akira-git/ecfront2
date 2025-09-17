@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { prisma } from '@/lib/prisma'
 
 type Props = {
@@ -10,7 +11,7 @@ export default async function ProducerPage({ params }: Props) {
 
   const producer = await prisma.producer.findUnique({
     where: { id },
-    include: { products: { where: { isActive: true }, take: 20 } }
+    include: { products: { where: { isActive: true }, take: 20, include: { inventory: true } } }
   })
 
   if (!producer) {
@@ -44,12 +45,18 @@ export default async function ProducerPage({ params }: Props) {
             <p className="text-gray-600">現在出品中の商品はありません。</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {producer.products.map((p) => (
-                <Link key={p.id} href={`/shop/products/${p.id}`} className="block border rounded-lg p-3 hover:shadow">
-                  <div className="font-medium">{p.name}</div>
-                  <div className="text-sm text-gray-600">¥{p.price.toLocaleString()}</div>
-                </Link>
-              ))}
+                {producer.products.map((p) => (
+                  <Link key={p.id} href={`/shop/products/${p.id}`} className="flex items-center gap-3 border rounded-lg p-3 hover:shadow">
+                    <div className="w-24 h-24 bg-gray-100 rounded overflow-hidden flex-shrink-0 relative">
+                      <Image src={p.image || '/images/placeholder.png'} alt={p.name} className="object-cover" fill sizes="96px" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium">{p.name}</div>
+                      <div className="text-sm text-gray-600">¥{p.price.toLocaleString()}</div>
+                      <div className="text-sm mt-1 text-gray-500">在庫: {p.inventory?.quantity ?? 0} 件</div>
+                    </div>
+                  </Link>
+                ))}
             </div>
           )}
         </div>
