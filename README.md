@@ -48,6 +48,9 @@ Password: customer123
 - **[開発ガイドライン](./docs/development-guidelines.md)** - 開発・運用のベストプラクティス
 - **[ドキュメント一覧](./docs/README.md)** - 全ドキュメントの詳細索引
 
+- **[リファクタ計画](./docs/REFACTOR_PLAN.md)** - 今後のリファクタ計画と手順
+- **[配送ドキュメント](./docs/delivery.md)** - 配送プロバイダ実装の詳細
+
 ## 🔧 技術スタック
 
 ### フロントエンド
