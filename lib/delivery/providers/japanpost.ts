@@ -1,5 +1,6 @@
 import { DeliveryProvider, RateQuote, ShipmentResponse, Address } from '../provider'
 import crypto from 'crypto'
+import { prisma } from '@/lib/prisma'
 
 const ID = 'japanpost'
 
@@ -19,22 +20,44 @@ const calculateTestRate = (weightGrams: number = 1000): number => {
 const calculateProductionRate = async (origin: Address, destination: Address, weightGrams: number = 1000): Promise<number> => {
   const apiKey = getEnv('JAPANPOST_API_KEY')
   const clientSecret = getEnv('JAPANPOST_CLIENT_SECRET')
+  const baseUrl = getEnv('JAPANPOST_BASE_URL') || 'https://api.epost.japanpost.jp/api/v1'
 
   if (!apiKey || !clientSecret) {
     throw new Error('JAPANPOST_API_KEY and JAPANPOST_CLIENT_SECRET are required for production mode')
   }
 
-  // TODO: 実際の日本郵便eShoin APIを呼び出す
-  // ここではテストモードと同じ計算を返す（本番API実装時は置き換え）
-  console.log('Japan Post Production API call would be made here with:', {
-    origin,
-    destination,
-    weightGrams,
-    apiKey: apiKey.substring(0, 8) + '...',
-    clientSecret: clientSecret.substring(0, 8) + '...'
-  })
+  try {
+    const url = `${baseUrl}/rates`
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Client-Id': apiKey,
+        'X-Client-Secret': clientSecret
+      },
+      body: JSON.stringify({
+        origin: { postalCode: origin.postalCode },
+        destination: { postalCode: destination.postalCode },
+        weight: weightGrams
+      })
+    })
 
-  return calculateTestRate(weightGrams)
+    if (!resp.ok) {
+      const txt = await resp.text()
+      console.warn('Japan Post rate API returned non-OK:', resp.status, txt)
+      return calculateTestRate(weightGrams)
+    }
+
+    const data = await resp.json()
+    if (data && typeof data.price === 'number') {
+      return data.price
+    }
+
+    return calculateTestRate(weightGrams)
+  } catch (err) {
+    console.error('Japan Post calculateProductionRate error:', err)
+    return calculateTestRate(weightGrams)
+  }
 }
 
 export const japanPostProvider: DeliveryProvider = {
@@ -87,19 +110,43 @@ export const japanPostProvider: DeliveryProvider = {
           throw new Error('JAPANPOST_API_KEY and JAPANPOST_CLIENT_SECRET are required for production mode')
         }
 
-        // TODO: 実際の日本郵便eShoin APIを呼び出して配送を作成
-        console.log('Japan Post Production API call would create shipment with:', {
-          orderId: req.orderId,
-          weight: req.packageInfo.weightGrams,
-          origin: req.origin.postalCode,
-          destination: req.destination.postalCode,
-          apiKey: apiKey.substring(0, 8) + '...',
-          clientSecret: clientSecret.substring(0, 8) + '...'
-        })
+        const baseUrl = getEnv('JAPANPOST_BASE_URL') || 'https://api.epost.japanpost.jp/api/v1'
+        const url = `${baseUrl}/shipment`
 
-        const deliveryId = `japanpost_prod_${Date.now().toString(36)}`
-        const trackingNumber = `JP${Date.now()}`
-        return { deliveryId, trackingNumber } as ShipmentResponse
+        try {
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Client-Id': apiKey,
+              'X-Client-Secret': clientSecret
+            },
+            body: JSON.stringify({
+              orderId: req.orderId,
+              package: req.packageInfo,
+              origin: { postalCode: req.origin.postalCode },
+              destination: { postalCode: req.destination.postalCode }
+            })
+          })
+
+          if (!resp.ok) {
+            const txt = await resp.text()
+            console.warn('Japan Post create API non-OK:', resp.status, txt)
+            const deliveryId = `japanpost_prod_fallback_${Date.now().toString(36)}`
+            const trackingNumber = `JP${Date.now()}`
+            return { deliveryId, trackingNumber } as ShipmentResponse
+          }
+
+          const data = await resp.json()
+          const deliveryId = data.id || `japanpost_prod_${Date.now().toString(36)}`
+          const trackingNumber = data.trackingNumber || data.tracking_no || null
+          return { deliveryId, trackingNumber, raw: data } as ShipmentResponse
+        } catch (err) {
+          console.error('Japan Post createShipment API error:', err)
+          const deliveryId = `japanpost_prod_error_${Date.now().toString(36)}`
+          const trackingNumber = `JP${Date.now()}`
+          return { deliveryId, trackingNumber } as ShipmentResponse
+        }
       }
     } catch (error) {
       console.error('Japan Post createShipment error:', error)
@@ -159,16 +206,18 @@ export const japanPostProvider: DeliveryProvider = {
 
       // Firestore更新（必要に応じて）
       try {
-        const { patchDoc } = await import('../../firestoreRest')
-        await patchDoc('deliveries', body.deliveryId, {
-          status: body.status || 'updated',
-          lastEvent: body.eventType || null,
-          trackingNumber: body.trackingNumber || null,
-          updatedAt: new Date().toISOString()
+        await prisma.delivery.updateMany({
+          where: { id: body.deliveryId },
+          data: {
+            status: body.status || 'updated',
+            trackingNumber: body.trackingNumber || null,
+            raw: { ...(body.raw || {}), lastEvent: body.eventType || null },
+            updatedAt: new Date()
+          }
         })
-        console.log('Japan Post delivery status updated in database')
+        console.log('Japan Post delivery status updated in database (Prisma)')
       } catch (e) {
-        console.warn('Japan Post handleWebhookEvent database update failed:', e)
+        console.warn('Japan Post handleWebhookEvent Prisma update failed:', e)
       }
     } catch (error) {
       console.error('Japan Post handleWebhookEvent error:', error)

@@ -55,8 +55,8 @@ export default function CheckoutPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          origin: { postalCode: '100-0001', address: '東京都中央区' },
-          destination: { postalCode, address },
+          origin: '東京都中央区', // 発送元（仮定）
+          destination: `${postalCode} ${address}`,
           weightGrams
         })
       })
@@ -93,8 +93,7 @@ export default function CheckoutPage() {
 
       if (session?.user?.id) {
         try {
-          const userUrl = (typeof window !== 'undefined' && window.location?.origin) ? `${window.location.origin}/api/user` : '/api/user'
-          const response = await fetch(userUrl, { credentials: 'include' })
+          const response = await fetch('/api/user')
           if (response.ok) {
             const userData = await response.json()
             setUserInfo(userData)
@@ -104,9 +103,6 @@ export default function CheckoutPage() {
             setPostalCode(queryPostalCode || userData.postalCode || '')
             setDeliveryService(queryDeliveryService)
             setShippingFee(queryShippingFee)
-          } else {
-            const text = await response.text().catch(() => '')
-            console.warn('[checkout] /api/user returned non-ok', response.status, text)
           }
         } catch (error) {
           console.error('ユーザー情報取得エラー:', error)
