@@ -41,35 +41,54 @@ export default async function ProducerPage({ params }: Props) {
 
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-medium mb-4">出品中の商品</h2>
-          {producer.products.length === 0 ? (
+            {producer.products.length === 0 ? (
             <p className="text-gray-600">現在出品中の商品はありません。</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {producer.products.map((p) => (
-                  <Link key={p.id} href={`/shop/products/${p.id}`} className="flex items-center gap-3 border rounded-lg p-3 hover:shadow">
-                    <div className="w-24 h-24 bg-gray-100 rounded overflow-hidden flex-shrink-0 relative">
-                      <Image src={p.image || '/images/placeholder.png'} alt={p.name} className="object-cover" fill sizes="96px" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium">{p.name}</div>
-                        {/* stock badge */}
-                        {(() => {
-                          const qty = p.inventory?.quantity ?? 0
-                          const minStock = p.inventory?.minStock ?? 0
-                          if (qty <= 0) {
-                            return <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">在庫なし</span>
-                          }
-                          if (qty <= Math.max(minStock, 5)) {
-                            return <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">残りわずか: {qty} 件</span>
-                          }
-                          return <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">在庫: {qty} 件</span>
-                        })()}
+              {producer.products.map((p) => {
+                const qty = p.inventory?.quantity ?? 0
+                const isOut = qty <= 0
+                return (
+                  <div key={p.id} className={`flex items-center gap-3 border rounded-lg p-3 ${isOut ? 'opacity-60' : ''}`}>
+                    <Link href={`/shop/products/${p.id}`} className="flex items-center gap-3 flex-1">
+                      <div className="w-24 h-24 bg-gray-100 rounded overflow-hidden flex-shrink-0 relative">
+                        <Image src={p.image || '/images/placeholder.png'} alt={p.name} className="object-cover" fill sizes="96px" />
                       </div>
-                      <div className="text-sm text-gray-600">¥{p.price.toLocaleString()}</div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <div className="font-medium">{p.name}</div>
+                          {/* stock badge */}
+                          {(() => {
+                            const minStock = p.inventory?.minStock ?? 0
+                            if (qty <= 0) {
+                              return <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">在庫なし</span>
+                            }
+                            if (qty <= Math.max(minStock, 5)) {
+                              return <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">残りわずか: {qty} 件</span>
+                            }
+                            return <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">在庫: {qty} 件</span>
+                          })()}
+                        </div>
+                        <div className="text-sm text-gray-600">¥{p.price.toLocaleString()}</div>
+                      </div>
+                    </Link>
+                    <div className="flex-shrink-0">
+                      <form method="post" action="#" onSubmit={(e) => e.preventDefault()}>
+                        <button
+                          disabled={isOut}
+                          className={`px-3 py-2 rounded text-white ${isOut ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                          // data attributes for potential client action
+                          data-product-id={p.id}
+                          data-product-name={p.name}
+                          data-product-price={p.price}
+                        >
+                          {isOut ? '在庫なし' : 'カートに入れる'}
+                        </button>
+                      </form>
                     </div>
-                  </Link>
-                ))}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
