@@ -51,9 +51,22 @@ export default async function ProducerPage({ params }: Props) {
                       <Image src={p.image || '/images/placeholder.png'} alt={p.name} className="object-cover" fill sizes="96px" />
                     </div>
                     <div className="flex-1">
-                      <div className="font-medium">{p.name}</div>
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{p.name}</div>
+                        {/* stock badge */}
+                        {(() => {
+                          const qty = p.inventory?.quantity ?? 0
+                          const minStock = p.inventory?.minStock ?? 0
+                          if (qty <= 0) {
+                            return <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">在庫なし</span>
+                          }
+                          if (qty <= Math.max(minStock, 5)) {
+                            return <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">残りわずか: {qty} 件</span>
+                          }
+                          return <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">在庫: {qty} 件</span>
+                        })()}
+                      </div>
                       <div className="text-sm text-gray-600">¥{p.price.toLocaleString()}</div>
-                      <div className="text-sm mt-1 text-gray-500">在庫: {p.inventory?.quantity ?? 0} 件</div>
                     </div>
                   </Link>
                 ))}
