@@ -50,6 +50,7 @@ export default async function ShopLayout({
                     <Link href="/" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors text-lg">ホーム</Link>
                     <Link href="/shop/products" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors text-lg">商品一覧</Link>
                     <Link href="/shop/producers" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors text-lg">生産者</Link>
+                    <Link href="/shop/mypage" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors text-lg">マイページ</Link>
                     <Link href="/shop/cart" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors text-lg">カート</Link>
                   </nav>
 
@@ -59,9 +60,10 @@ export default async function ShopLayout({
                     
                     {session?.user ? (
                       <div className="flex items-center space-x-6 bg-emerald-50 rounded-full px-6 py-3">
-                        <span className="text-emerald-800 font-medium">
+                        <Link href="/shop/mypage" className="text-emerald-800 font-medium hover:underline">
                           {session.user.name || session.user.email}さん
-                        </span>
+                        </Link>
+                        <Link href="/shop/mypage" className="text-emerald-600 hover:text-emerald-700 transition-colors font-medium">マイページ</Link>
                         <SignOutButton className="text-emerald-600 hover:text-emerald-700 transition-colors font-medium">
                           ログアウト
                         </SignOutButton>
@@ -93,6 +95,10 @@ export default async function ShopLayout({
                       <span className="text-2xl mb-2">🌾</span>
                       <span className="text-sm">生産者</span>
                     </Link>
+                    <Link href="/shop/mypage" className="flex flex-col items-center font-medium text-gray-600 hover:text-emerald-600 transition-colors">
+                      <span className="text-2xl mb-2">👤</span>
+                      <span className="text-sm">マイページ</span>
+                    </Link>
                     <Link href="/shop/cart" className="flex flex-col items-center font-medium text-gray-600 hover:text-emerald-600 transition-colors">
                       <span className="text-2xl mb-2">🛍️</span>
                       <span className="text-sm">カート</span>
@@ -112,15 +118,9 @@ export default async function ShopLayout({
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <div>
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-white font-bold">
-                        EP
-                      </div>
-                      <span className="font-bold text-gray-900">Eagle Palace</span>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      新鮮で安心な地元産品を、生産者から直接お届けします。
-                    </p>
+                      <p className="text-sm text-gray-600">
+                        新鮮で安心な地元産品を、生産者から直接お届けします。
+                      </p>
                   </div>
                   
                   <div>

@@ -1,0 +1,24 @@
+Subject: Add FavoriteProducer table - Please apply SQL
+
+Hi,
+
+Please apply the attached SQL to add the `FavoriteProducer` table to the database. This is a non-destructive change that creates a table and adds indexes and foreign keys.
+
+Files:
+- `prisma/sql/add_favorite_producer.sql`  (SQL to execute)
+- `prisma/sql/ADMIN_INSTRUCTIONS.md`     (backup & verification steps)
+
+Quick command (psql):
+
+```bash
+psql "$DATABASE_URL" -f prisma/sql/add_favorite_producer.sql
+```
+
+After applying, please confirm and notify the developer to run:
+
+```bash
+npx prisma db pull
+npx prisma generate
+```
+
+Thank you.

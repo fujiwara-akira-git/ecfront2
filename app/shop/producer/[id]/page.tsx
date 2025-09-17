@@ -1,18 +1,24 @@
 import Link from 'next/link'
 import Image from 'next/image'
+import AddToCartButton from '@/app/shop/producer/AddToCartButton'
+import FavoriteToggle from '@/app/shop/producer/FavoriteToggle'
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/options'
 
 type Props = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default async function ProducerPage({ params }: Props) {
-  const { id } = params
+  const { id } = await params
 
   const producer = await prisma.producer.findUnique({
     where: { id },
     include: { products: { where: { isActive: true }, take: 20, include: { inventory: true } } }
   })
+
+  const session = await getServerSession(authOptions)
 
   if (!producer) {
     return (
@@ -37,6 +43,11 @@ export default async function ProducerPage({ params }: Props) {
           {producer.address && <p className="mt-2 text-sm text-gray-600">住所: {producer.address}</p>}
           {producer.phone && <p className="mt-1 text-sm text-gray-600">電話: {producer.phone}</p>}
           {producer.email && <p className="mt-1 text-sm text-gray-600">メール: {producer.email}</p>}
+          {session?.user?.id && (
+            <div className="mt-4">
+              <FavoriteToggle producerId={producer.id} initial={!!(await prisma.favoriteProducer.findFirst({ where: { userId: session.user.id, producerId: producer.id } }))} />
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-lg shadow-sm p-6">
@@ -48,11 +59,22 @@ export default async function ProducerPage({ params }: Props) {
               {producer.products.map((p) => {
                 const qty = p.inventory?.quantity ?? 0
                 const isOut = qty <= 0
+                let imgSrc = '/images/placeholder.svg'
+                if (typeof p.image === 'string') {
+                  const s = p.image.trim()
+                  // only accept absolute http(s) or root-relative paths
+                  if (s.startsWith('/') || s.match(/^https?:\/\//i)) {
+                    imgSrc = s
+                  } else {
+                    // log suspicious image values for investigation (include product id)
+                    console.warn('[ProducerPage] invalid product.image for product', p.id, ', using placeholder:', s)
+                  }
+                }
                 return (
                   <div key={p.id} className={`flex items-center gap-3 border rounded-lg p-3 ${isOut ? 'opacity-60' : ''}`}>
                     <Link href={`/shop/products/${p.id}`} className="flex items-center gap-3 flex-1">
-                      <div className="w-24 h-24 bg-gray-100 rounded overflow-hidden flex-shrink-0 relative">
-                        <Image src={p.image || '/images/placeholder.png'} alt={p.name} className="object-cover" fill sizes="96px" />
+                      <div className="w-24 h-24 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                        <Image src={imgSrc} alt={p.name} className="object-cover" width={96} height={96} />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
@@ -73,18 +95,7 @@ export default async function ProducerPage({ params }: Props) {
                       </div>
                     </Link>
                     <div className="flex-shrink-0">
-                      <form method="post" action="#" onSubmit={(e) => e.preventDefault()}>
-                        <button
-                          disabled={isOut}
-                          className={`px-3 py-2 rounded text-white ${isOut ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
-                          // data attributes for potential client action
-                          data-product-id={p.id}
-                          data-product-name={p.name}
-                          data-product-price={p.price}
-                        >
-                          {isOut ? '在庫なし' : 'カートに入れる'}
-                        </button>
-                      </form>
+                      <AddToCartButton product={p as any} disabled={isOut} />
                     </div>
                   </div>
                 )
