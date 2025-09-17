@@ -96,7 +96,7 @@ touch .env.local
 DATABASE_URL="postgresql://postgres:your_password@localhost:5432/ep_dev"
 
 # NextAuth設定
-NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_URL="config.getBaseUrl()"
 NEXTAUTH_SECRET="your-nextauth-secret-key-here"
 
 # 開発環境設定
@@ -172,7 +172,7 @@ npx prisma studio
 npm run dev
 ```
 
-アプリケーションが `http://localhost:3000` で起動します。
+アプリケーションが `config.getBaseUrl()` で起動します。
 
 ## 👥 テストユーザー
 
@@ -192,11 +192,11 @@ npm run dev
 
 以下のURLで各機能をテストできます：
 
-1. **ホームページ**: http://localhost:3000
-2. **商品一覧**: http://localhost:3000/shop/products
-3. **ログイン画面**: http://localhost:3000/shop/auth/signin
-4. **管理画面**: http://localhost:3000/admin （管理者ログイン後）
-5. **データベーステスト**: http://localhost:3000/api/test/db
+1. **ホームページ**: `config.getBaseUrl()`
+2. **商品一覧**: `config.getBaseUrl()`/shop/products
+3. **ログイン画面**: `config.getBaseUrl()`/shop/auth/signin
+4. **管理画面**: `config.getBaseUrl()`/admin （管理者ログイン後）
+5. **データベーステスト**: `config.getBaseUrl()`/api/test/db
 
 ## 🛠️ トラブルシューティング
 

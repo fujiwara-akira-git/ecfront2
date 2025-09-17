@@ -106,9 +106,9 @@ customer@test.com / customer123
 
 ```bash
 # 開発環境
-http://localhost:3000          # ホーム
-http://localhost:3000/shop     # ショップ
-http://localhost:3000/admin    # 管理画面
+`config.getBaseUrl()`          # ホーム
+`config.getBaseUrl()`/shop     # ショップ
+`config.getBaseUrl()`/admin    # 管理画面
 ```
 
 ## 🆘 困った時は

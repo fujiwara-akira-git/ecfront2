@@ -334,7 +334,7 @@ NextAuth.jsは以下のプロバイダーをサポート：
    password: admin123
    
    # アクセステスト
-   http://localhost:3000/admin
+  `config.getBaseUrl()`/admin
    ```
 
 2. **一般ユーザー機能テスト**
@@ -344,13 +344,13 @@ NextAuth.jsは以下のプロバイダーをサポート：
    password: customer123
    
    # アクセステスト
-   http://localhost:3000/shop
+  `config.getBaseUrl()`/shop
    ```
 
 3. **認証API テスト**
    ```bash
    # ログイン API
-   curl -X POST http://localhost:3000/api/auth/signin \
+  curl -X POST `config.getBaseUrl()`/api/auth/signin \
      -H "Content-Type: application/json" \
      -d '{"email":"admin@test.com","password":"admin123"}'
    ```

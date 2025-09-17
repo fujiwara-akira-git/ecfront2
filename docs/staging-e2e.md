@@ -51,7 +51,7 @@ stripe checkout sessions create \
 5. 失敗時の対処
 
 - `STRIPE_WEBHOOK_SECRET` が一致しない場合、Webhook は拒否されます。Stripe CLI を使う場合は `stripe listen` が発行する signing secret を `STRIPE_WEBHOOK_SECRET` に設定してください。
-- `NEXTAUTH_URL` は `http://localhost:3000` のように正しいURLを指していることを確認してください。プロキシやポート違いが原因で失敗する場合があります。
+ - `NEXTAUTH_URL` は `config.getBaseUrl()` が指すURLに合わせてください。プロキシやポート違いが原因で失敗する場合があります。
 
 ## 補足
 - 本番では `stripe listen` を使わず Stripe の管理画面で webhook を登録してください。

@@ -24,7 +24,7 @@ npm run seed
 npm run dev
 ```
 
-アプリケーションが `http://localhost:3000` で起動します。
+アプリケーションが `config.getBaseUrl()` で起動します（開発時の既定は `http://localhost:3001`）。
 
 ## 📋 テストユーザー
 
@@ -104,7 +104,7 @@ Password: customer123
 ### 開発環境
 
 ```bash
-npm run dev  # http://localhost:3000
+npm run dev  # starts at config.getBaseUrl() (default http://localhost:3001)
 ```
 
 ### 本番環境

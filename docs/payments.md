@@ -16,7 +16,7 @@ This document describes the minimal integration plan for Square-based POS and we
 - NEXT_PUBLIC_APP_URL
 
 ## Local testing
-Use ngrok to expose `http://localhost:3000` to Square sandbox and configure webhooks.
+Use ngrok to expose `config.getBaseUrl()` to Square sandbox and configure webhooks.
 
 ## Next steps
 - Implement signature verification in `lib/providers/square.ts`

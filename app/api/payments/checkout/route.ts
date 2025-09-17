@@ -14,6 +14,8 @@ export async function POST(req: Request) {
     })
 
     const provider = getPaymentProvider()
+  console.log('[payments/checkout] PAYMENT_PROVIDER env:', process.env.PAYMENT_PROVIDER || '(unset)')
+  console.log('[payments/checkout] provider loaded:', typeof provider === 'object' ? Object.keys(provider) : String(provider))
     if (!provider || typeof provider.createCheckoutSession !== 'function') {
       console.error('[payments/checkout] invalid payment provider loaded', provider)
       return NextResponse.json({ error: 'invalid payment provider' }, { status: 500 })

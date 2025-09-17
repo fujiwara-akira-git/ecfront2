@@ -1,37 +1,506 @@
 
-> eagle-palace-ec@1.0.0 start
-> next start
+> eagle-palace-ec@1.0.0 dev
+> next dev
+
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/akira2/package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * /Users/akira2/projects/eagle-palace/ecfront-main2/package-lock.json
 
    ▲ Next.js 15.5.3
    - Local:        http://localhost:3000
    - Network:      http://172.20.10.2:3000
+   - Environments: .env.local
 
  ✓ Starting...
- ✓ Ready in 359ms
+ ✓ Ready in 1887ms
+ ○ Compiling /api/payments/checkout ...
+ ✓ Compiled /api/payments/checkout in 791ms (503 modules)
+ POST /api/payments/checkout 400 in 1011ms
+[payments/checkout] creating session for order: { items: 0, currency: undefined, total: null }
+[payments/checkout] PAYMENT_PROVIDER env: stripe
+[payments/checkout] provider loaded: [ 'createCheckoutSession', 'verifyWebhook', 'handleWebhookEvent' ]
+[stripe] using appUrl for success/cancel urls: http://localhost:3000
+Stripe: 既存顧客を使用: cus_T3bAmsjwNv5z7B
+Stripe: updated existing customer with new info cus_T3bAmsjwNv5z7B
+Stripe: 既存顧客を使用: cus_T3bAmsjwNv5z7B
+ POST /api/payments/checkout 200 in 1862ms
+Stripe: updated existing customer with new info cus_T3bAmsjwNv5z7B
+[stripe] sessionOptions preview: {
+  success_url: 'http://localhost:3000/shop/checkout/success?session_id={CHECKOUT_SESSION_ID}',
+  cancel_url: 'http://localhost:3000/shop/checkout/cancel'
+}
+[payments/checkout] unexpected error: [Error: The `line_items` parameter is required in payment mode.] {
+  type: 'StripeInvalidRequestError',
+  raw: [Object],
+  rawType: 'invalid_request_error',
+  code: undefined,
+  doc_url: undefined,
+  param: undefined,
+  detail: undefined,
+  headers: [Object],
+  requestId: 'req_83eNVsC8icGX9i',
+  statusCode: 400,
+  userMessage: undefined,
+  charge: undefined,
+  decline_code: undefined,
+  payment_intent: undefined,
+  payment_method: undefined,
+  payment_method_type: undefined,
+  setup_intent: undefined,
+  source: undefined
+}
+[payments/checkout] creating session for order: { items: 1, currency: 'jpy', total: 1500 }
+[payments/checkout] PAYMENT_PROVIDER env: stripe
+[payments/checkout] provider loaded: [ 'createCheckoutSession', 'verifyWebhook', 'handleWebhookEvent' ]
+[stripe] using appUrl for success/cancel urls: http://localhost:3000
+Stripe: 既存顧客を使用: cus_T3bAmsjwNv5z7B
+Stripe: updated existing customer with new info cus_T3bAmsjwNv5z7B
+Stripe: 既存顧客を使用: cus_T3bAmsjwNv5z7B
+Stripe: updated existing customer with new info cus_T3bAmsjwNv5z7B
+[stripe] sessionOptions preview: {
+  success_url: 'http://localhost:3000/shop/checkout/success?session_id={CHECKOUT_SESSION_ID}',
+  cancel_url: 'http://localhost:3000/shop/checkout/cancel'
+}
+[payments/checkout] provider result: {
+  checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_b1630jXQ8GnuKXw1tVxP3oqb7omfLK6uYNNC09fA0rLTNfCGshpTlYYY6S#fidkdWxOYHwnPyd1blpxYHZxWjA0VjZrXzZPdDx0XGpLNWBrMX1JPF9JcE89a2FgZzVkVGdGf1VJQH1TVjBwVjU9dGZkZnJGVHBmXzc2QjJTQ2t0MEhkPGZ1XDRMYmdSV2JkdzU9Z3xhXGpmNTVBT2FGTF01bCcpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl',
+  sessionId: 'cs_test_b1630jXQ8GnuKXw1tVxP3oqb7omfLK6uYNNC09fA0rLTNfCGshpTlYYY6S'
+}
+ POST /api/payments/checkout 200 in 2099ms
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 633ms (216 modules)
+ ○ Compiling /shop/checkout/cancel ...
+ ✓ Compiled /shop/checkout/cancel in 1472ms (1136 modules)
 🔄 CartProvider render: {
-  sessionId: undefined,
-  status: 'unauthenticated',
-  itemsCount: 0,
-  lastSyncTime: 0,
-  hasInitialized: false,
-  syncInProgress: false
-}
-[auth][authorize] lookup {
-  email: 'customer@example.com',
-  found: true,
-  userId: 'ed9fbf83-26df-4e32-893e-86c4ea427bc7',
-  hasPassword: true
-}
-[auth][authorize] comparing password for user { userId: 'ed9fbf83-26df-4e32-893e-86c4ea427bc7' }
-[auth][authorize] password compare result {
-  userId: 'ed9fbf83-26df-4e32-893e-86c4ea427bc7',
-  isValidPassword: true
-}
-🔄 CartProvider render: {
-  sessionId: 'ed9fbf83-26df-4e32-893e-86c4ea427bc7',
+  sessionId: 'c8389f2c-e1fa-418a-9f9d-b7cc01aefdba',
   status: 'authenticated',
   itemsCount: 0,
   lastSyncTime: 0,
   hasInitialized: false,
   syncInProgress: false
 }
+ GET /shop/checkout/cancel 200 in 2427ms
+ ○ Compiling /api/cart ...
+ ✓ Compiled /api/cart in 983ms (1138 modules)
+prisma:info Starting a postgresql pool with 17 connections.
+ ○ Compiling /shop/cart ...
+ ✓ Compiled /shop/cart in 2.1s (1145 modules)
+prisma:query SELECT "public"."CartItem"."id", "public"."CartItem"."userId", "public"."CartItem"."productId", "public"."CartItem"."quantity", "public"."CartItem"."createdAt", "public"."CartItem"."updatedAt" FROM "public"."CartItem" WHERE "public"."CartItem"."userId" = $1 OFFSET $2
+ GET /shop/cart 200 in 2702ms
+prisma:query SELECT "public"."Product"."id", "public"."Product"."name", "public"."Product"."description", "public"."Product"."price", "public"."Product"."image", "public"."Product"."categoryId", "public"."Product"."producerId", "public"."Product"."isActive", "public"."Product"."createdAt", "public"."Product"."updatedAt" FROM "public"."Product" WHERE "public"."Product"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."Producer"."id", "public"."Producer"."name", "public"."Producer"."description", "public"."Producer"."address", "public"."Producer"."phone", "public"."Producer"."email", "public"."Producer"."createdAt", "public"."Producer"."updatedAt" FROM "public"."Producer" WHERE "public"."Producer"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."Inventory"."id", "public"."Inventory"."productId", "public"."Inventory"."quantity", "public"."Inventory"."reservedQty", "public"."Inventory"."minStock", "public"."Inventory"."maxStock", "public"."Inventory"."lastUpdated", "public"."Inventory"."createdAt" FROM "public"."Inventory" WHERE "public"."Inventory"."productId" IN ($1) OFFSET $2
+ GET /api/cart 200 in 6202ms
+prisma:query SELECT "public"."CartItem"."id", "public"."CartItem"."userId", "public"."CartItem"."productId", "public"."CartItem"."quantity", "public"."CartItem"."createdAt", "public"."CartItem"."updatedAt" FROM "public"."CartItem" WHERE "public"."CartItem"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."Product"."id", "public"."Product"."name", "public"."Product"."description", "public"."Product"."price", "public"."Product"."image", "public"."Product"."categoryId", "public"."Product"."producerId", "public"."Product"."isActive", "public"."Product"."createdAt", "public"."Product"."updatedAt" FROM "public"."Product" WHERE "public"."Product"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."Producer"."id", "public"."Producer"."name", "public"."Producer"."description", "public"."Producer"."address", "public"."Producer"."phone", "public"."Producer"."email", "public"."Producer"."createdAt", "public"."Producer"."updatedAt" FROM "public"."Producer" WHERE "public"."Producer"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."Inventory"."id", "public"."Inventory"."productId", "public"."Inventory"."quantity", "public"."Inventory"."reservedQty", "public"."Inventory"."minStock", "public"."Inventory"."maxStock", "public"."Inventory"."lastUpdated", "public"."Inventory"."createdAt" FROM "public"."Inventory" WHERE "public"."Inventory"."productId" IN ($1) OFFSET $2
+ GET /api/cart 200 in 1032ms
+prisma:query SELECT "public"."CartItem"."id", "public"."CartItem"."userId", "public"."CartItem"."productId", "public"."CartItem"."quantity", "public"."CartItem"."createdAt", "public"."CartItem"."updatedAt" FROM "public"."CartItem" WHERE "public"."CartItem"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."Product"."id", "public"."Product"."name", "public"."Product"."description", "public"."Product"."price", "public"."Product"."image", "public"."Product"."categoryId", "public"."Product"."producerId", "public"."Product"."isActive", "public"."Product"."createdAt", "public"."Product"."updatedAt" FROM "public"."Product" WHERE "public"."Product"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."Producer"."id", "public"."Producer"."name", "public"."Producer"."description", "public"."Producer"."address", "public"."Producer"."phone", "public"."Producer"."email", "public"."Producer"."createdAt", "public"."Producer"."updatedAt" FROM "public"."Producer" WHERE "public"."Producer"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."Inventory"."id", "public"."Inventory"."productId", "public"."Inventory"."quantity", "public"."Inventory"."reservedQty", "public"."Inventory"."minStock", "public"."Inventory"."maxStock", "public"."Inventory"."lastUpdated", "public"."Inventory"."createdAt" FROM "public"."Inventory" WHERE "public"."Inventory"."productId" IN ($1) OFFSET $2
+ GET /api/cart 200 in 1275ms
+ ○ Compiling /shop/shipping ...
+ ✓ Compiled /shop/shipping in 690ms (1152 modules)
+ GET /shop/shipping 200 in 1063ms
+ ○ Compiling /api/user ...
+ ✓ Compiled /api/user in 504ms (1154 modules)
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 1383ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 304ms
+ ○ Compiling /shop/checkout ...
+ ✓ Compiled /shop/checkout in 627ms (960 modules)
+ GET /shop/checkout?name=%E3%83%86%E3%82%B9%E3%83%88%E5%90%8D%E5%89%8D%EF%BC%92&phone=05058752903&address=%E9%8A%80%E5%BA%A7&postalCode=1040061&city=%E4%B8%AD%E5%A4%AE%E5%8C%BA&state=%E6%9D%B1%E4%BA%AC%E9%83%BD&email=customer2%40example.com&deliveryService=japanpost&shippingFee=800 200 in 908ms
+prisma:query SELECT 1
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 465ms
+ ○ Compiling /api/delivery/rates ...
+ GET /api/user 200 in 628ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ ✓ Compiled /api/delivery/rates in 850ms (964 modules)
+Yamato Test Mode - Calculated rate: 600 for weight: 500
+Japan Post Test Mode - Calculated rate: 700 for weight: 500
+ POST /api/delivery/rates 200 in 1014ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 1210ms
+Yamato Test Mode - Calculated rate: 600 for weight: 500
+Japan Post Test Mode - Calculated rate: 700 for weight: 500
+ POST /api/delivery/rates 200 in 13ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 613ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 218ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 234ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 216ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 230ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 229ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 234ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 225ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 215ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 250ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 248ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 255ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 223ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 215ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 367ms
+ GET /api/user 200 in 237ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ ✓ Compiled /api/payments/checkout in 166ms (887 modules)
+[payments/checkout] creating session for order: { items: 1, currency: 'jpy', total: null }
+[payments/checkout] PAYMENT_PROVIDER env: stripe
+[payments/checkout] provider loaded: [ 'createCheckoutSession', 'verifyWebhook', 'handleWebhookEvent' ]
+[stripe] using appUrl for success/cancel urls: http://localhost:3000
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 780ms
+Stripe: 既存顧客を使用: cus_T3bAmsjwNv5z7B
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 211ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 216ms
+Stripe: updated existing customer with new info cus_T3bAmsjwNv5z7B
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 215ms
+Stripe: 既存顧客を使用: cus_T3bAmsjwNv5z7B
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 216ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 219ms
+Stripe: updated existing customer with new info cus_T3bAmsjwNv5z7B
+[stripe] sessionOptions preview: {
+  success_url: 'http://localhost:3000/shop/checkout/success?session_id={CHECKOUT_SESSION_ID}',
+  cancel_url: 'http://localhost:3000/shop/checkout/cancel'
+}
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 216ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 555ms
+[payments/checkout] provider result: {
+  checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_b1gBMN3597XU6N8vXfow9QmZWuNK0SAQPEBJHg4ndZGiWhMrLyHhdDOVxH#fidkdWxOYHwnPyd1blpxYHZxWjA0VjZrXzZPdDx0XGpLNWBrMX1JPF9JcE89a2FgZzVkVGdGf1VJQH1TVjBwVjU9dGZkZnJGVHBmXzc2QjJTQ2t0MEhkPGZ1XDRMYmdSV2JkdzU9Z3xhXGpmNTVBT2FGTF01bCcpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl',
+  sessionId: 'cs_test_b1gBMN3597XU6N8vXfow9QmZWuNK0SAQPEBJHg4ndZGiWhMrLyHhdDOVxH'
+}
+ POST /api/payments/checkout 200 in 2656ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 233ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+🔄 CartProvider render: {
+  sessionId: 'c8389f2c-e1fa-418a-9f9d-b7cc01aefdba',
+  status: 'authenticated',
+  itemsCount: 0,
+  lastSyncTime: 0,
+  hasInitialized: false,
+  syncInProgress: false
+}
+ GET /shop/checkout?name=%E3%83%86%E3%82%B9%E3%83%88%E5%90%8D%E5%89%8D%EF%BC%92&phone=05058752903&address=%E9%8A%80%E5%BA%A7&postalCode=1040061&city=%E4%B8%AD%E5%A4%AE%E5%8C%BA&state=%E6%9D%B1%E4%BA%AC%E9%83%BD&email=customer2%40example.com&deliveryService=japanpost&shippingFee=800 200 in 318ms
+prisma:query SELECT 1
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 718ms
+Yamato Test Mode - Calculated rate: 600 for weight: 0
+Japan Post Test Mode - Calculated rate: 700 for weight: 0
+ POST /api/delivery/rates 200 in 23ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 232ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 668ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 232ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 240ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 234ms
+ GET /api/user 200 in 224ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+prisma:query SELECT "public"."CartItem"."id", "public"."CartItem"."userId", "public"."CartItem"."productId", "public"."CartItem"."quantity", "public"."CartItem"."createdAt", "public"."CartItem"."updatedAt" FROM "public"."CartItem" WHERE "public"."CartItem"."userId" = $1 OFFSET $2
+ ✓ Compiled /api/auth/[...nextauth] in 498ms (1167 modules)
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 743ms
+prisma:query SELECT "public"."Product"."id", "public"."Product"."name", "public"."Product"."description", "public"."Product"."price", "public"."Product"."image", "public"."Product"."categoryId", "public"."Product"."producerId", "public"."Product"."isActive", "public"."Product"."createdAt", "public"."Product"."updatedAt" FROM "public"."Product" WHERE "public"."Product"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 230ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 241ms
+ GET /api/auth/csrf 200 in 1348ms
+ POST /api/auth/signout 200 in 16ms
+ GET /api/auth/session 200 in 13ms
+prisma:query SELECT "public"."Producer"."id", "public"."Producer"."name", "public"."Producer"."description", "public"."Producer"."address", "public"."Producer"."phone", "public"."Producer"."email", "public"."Producer"."createdAt", "public"."Producer"."updatedAt" FROM "public"."Producer" WHERE "public"."Producer"."id" IN ($1) OFFSET $2
+ GET /api/user 200 in 226ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ ○ Compiling /shop/auth/signin ...
+ GET /api/cart 200 in 4824ms
+prisma:query SELECT "public"."Inventory"."id", "public"."Inventory"."productId", "public"."Inventory"."quantity", "public"."Inventory"."reservedQty", "public"."Inventory"."minStock", "public"."Inventory"."maxStock", "public"."Inventory"."lastUpdated", "public"."Inventory"."createdAt" FROM "public"."Inventory" WHERE "public"."Inventory"."productId" IN ($1) OFFSET $2
+ ✓ Compiled /shop/auth/signin in 1754ms (1186 modules)
+Yamato Test Mode - Calculated rate: 600 for weight: 500
+Japan Post Test Mode - Calculated rate: 700 for weight: 500
+ POST /api/delivery/rates 200 in 872ms
+ GET /shop/auth/signin?returnTo=%2Fshop%2Fcheckout 200 in 2108ms
+ GET /shop/auth/signin?returnTo=%2Fshop%2Fcheckout 200 in 126ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 2344ms
+prisma:query SELECT "public"."Product"."id", "public"."Product"."name", "public"."Product"."description", "public"."Product"."price", "public"."Product"."image", "public"."Product"."categoryId", "public"."Product"."producerId", "public"."Product"."isActive", "public"."Product"."createdAt", "public"."Product"."updatedAt" FROM "public"."Product" WHERE "public"."Product"."isActive" = $1 ORDER BY "public"."Product"."createdAt" DESC OFFSET $2
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 295ms
+prisma:query SELECT "public"."Category"."id", "public"."Category"."name", "public"."Category"."description", "public"."Category"."createdAt", "public"."Category"."updatedAt" FROM "public"."Category" WHERE "public"."Category"."id" IN ($1,$2) OFFSET $3
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 268ms
+prisma:query SELECT "public"."Producer"."id", "public"."Producer"."name", "public"."Producer"."description", "public"."Producer"."address", "public"."Producer"."phone", "public"."Producer"."email", "public"."Producer"."createdAt", "public"."Producer"."updatedAt" FROM "public"."Producer" WHERE "public"."Producer"."id" IN ($1,$2,$3,$4,$5) OFFSET $6
+prisma:query SELECT "public"."Inventory"."id", "public"."Inventory"."productId", "public"."Inventory"."quantity", "public"."Inventory"."reservedQty", "public"."Inventory"."minStock", "public"."Inventory"."maxStock", "public"."Inventory"."lastUpdated", "public"."Inventory"."createdAt" FROM "public"."Inventory" WHERE "public"."Inventory"."productId" IN ($1,$2,$3,$4,$5,$6) OFFSET $7
+ GET /shop 200 in 4114ms
+ GET /api/auth/csrf 200 in 23ms
+ POST /api/auth/signout 200 in 17ms
+ GET /api/auth/session 200 in 14ms
+prisma:query SELECT "public"."Product"."id", "public"."Product"."name", "public"."Product"."description", "public"."Product"."price", "public"."Product"."image", "public"."Product"."categoryId", "public"."Product"."producerId", "public"."Product"."isActive", "public"."Product"."createdAt", "public"."Product"."updatedAt" FROM "public"."Product" WHERE "public"."Product"."isActive" = $1 ORDER BY "public"."Product"."createdAt" DESC OFFSET $2
+prisma:query SELECT "public"."Category"."id", "public"."Category"."name", "public"."Category"."description", "public"."Category"."createdAt", "public"."Category"."updatedAt" FROM "public"."Category" WHERE "public"."Category"."id" IN ($1,$2) OFFSET $3
+prisma:query SELECT "public"."Product"."id", "public"."Product"."name", "public"."Product"."description", "public"."Product"."price", "public"."Product"."image", "public"."Product"."categoryId", "public"."Product"."producerId", "public"."Product"."isActive", "public"."Product"."createdAt", "public"."Product"."updatedAt" FROM "public"."Product" WHERE "public"."Product"."isActive" = $1 ORDER BY "public"."Product"."createdAt" DESC OFFSET $2
+prisma:query SELECT "public"."Producer"."id", "public"."Producer"."name", "public"."Producer"."description", "public"."Producer"."address", "public"."Producer"."phone", "public"."Producer"."email", "public"."Producer"."createdAt", "public"."Producer"."updatedAt" FROM "public"."Producer" WHERE "public"."Producer"."id" IN ($1,$2,$3,$4,$5) OFFSET $6
+prisma:query SELECT "public"."Inventory"."id", "public"."Inventory"."productId", "public"."Inventory"."quantity", "public"."Inventory"."reservedQty", "public"."Inventory"."minStock", "public"."Inventory"."maxStock", "public"."Inventory"."lastUpdated", "public"."Inventory"."createdAt" FROM "public"."Inventory" WHERE "public"."Inventory"."productId" IN ($1,$2,$3,$4,$5,$6) OFFSET $7
+ GET /shop 200 in 917ms
+prisma:query SELECT "public"."Category"."id", "public"."Category"."name", "public"."Category"."description", "public"."Category"."createdAt", "public"."Category"."updatedAt" FROM "public"."Category" WHERE "public"."Category"."id" IN ($1,$2) OFFSET $3
+prisma:query SELECT "public"."Producer"."id", "public"."Producer"."name", "public"."Producer"."description", "public"."Producer"."address", "public"."Producer"."phone", "public"."Producer"."email", "public"."Producer"."createdAt", "public"."Producer"."updatedAt" FROM "public"."Producer" WHERE "public"."Producer"."id" IN ($1,$2,$3,$4,$5) OFFSET $6
+prisma:query SELECT "public"."Inventory"."id", "public"."Inventory"."productId", "public"."Inventory"."quantity", "public"."Inventory"."reservedQty", "public"."Inventory"."minStock", "public"."Inventory"."maxStock", "public"."Inventory"."lastUpdated", "public"."Inventory"."createdAt" FROM "public"."Inventory" WHERE "public"."Inventory"."productId" IN ($1,$2,$3,$4,$5,$6) OFFSET $7
+ GET /shop 200 in 2252ms
+ GET /shop/auth/signin 200 in 33ms
+ GET /api/auth/providers 200 in 42ms
+ GET /api/auth/csrf 200 in 15ms
+prisma:query SELECT 1
+prisma:query SELECT "public"."User"."id", "public"."User"."firebaseUid", "public"."User"."email", "public"."User"."createdAt", "public"."User"."address", "public"."User"."name", "public"."User"."password", "public"."User"."phone", "public"."User"."updatedAt", "public"."User"."userType", "public"."User"."postalCode", "public"."User"."stripeCustomerId" FROM "public"."User" WHERE ("public"."User"."email" = $1 AND 1=1) LIMIT $2 OFFSET $3
+[auth][authorize] lookup {
+  email: 'customer5@example.com',
+  found: true,
+  userId: '42c1adb5-5ed4-4385-b58b-77f904ed40d2',
+  hasPassword: true
+}
+[auth][authorize] comparing password for user { userId: '42c1adb5-5ed4-4385-b58b-77f904ed40d2' }
+[auth][authorize] password compare result {
+  userId: '42c1adb5-5ed4-4385-b58b-77f904ed40d2',
+  isValidPassword: true
+}
+ POST /api/auth/callback/credentials 200 in 1180ms
+ GET /api/auth/session 200 in 14ms
+ GET /api/auth/session 200 in 25ms
+🔄 CartProvider render: {
+  sessionId: '42c1adb5-5ed4-4385-b58b-77f904ed40d2',
+  status: 'authenticated',
+  itemsCount: 0,
+  lastSyncTime: 0,
+  hasInitialized: false,
+  syncInProgress: false
+}
+prisma:query SELECT "public"."Product"."id", "public"."Product"."name", "public"."Product"."description", "public"."Product"."price", "public"."Product"."image", "public"."Product"."categoryId", "public"."Product"."producerId", "public"."Product"."isActive", "public"."Product"."createdAt", "public"."Product"."updatedAt" FROM "public"."Product" WHERE "public"."Product"."isActive" = $1 ORDER BY "public"."Product"."createdAt" DESC OFFSET $2
+prisma:query SELECT "public"."Category"."id", "public"."Category"."name", "public"."Category"."description", "public"."Category"."createdAt", "public"."Category"."updatedAt" FROM "public"."Category" WHERE "public"."Category"."id" IN ($1,$2) OFFSET $3
+prisma:query SELECT "public"."Producer"."id", "public"."Producer"."name", "public"."Producer"."description", "public"."Producer"."address", "public"."Producer"."phone", "public"."Producer"."email", "public"."Producer"."createdAt", "public"."Producer"."updatedAt" FROM "public"."Producer" WHERE "public"."Producer"."id" IN ($1,$2,$3,$4,$5) OFFSET $6
+prisma:query SELECT "public"."Inventory"."id", "public"."Inventory"."productId", "public"."Inventory"."quantity", "public"."Inventory"."reservedQty", "public"."Inventory"."minStock", "public"."Inventory"."maxStock", "public"."Inventory"."lastUpdated", "public"."Inventory"."createdAt" FROM "public"."Inventory" WHERE "public"."Inventory"."productId" IN ($1,$2,$3,$4,$5,$6) OFFSET $7
+ GET /shop 200 in 1804ms
+ ○ Compiling /api/cart/migrate ...
+ ✓ Compiled /api/cart/migrate in 590ms (1188 modules)
+🚚 カート移行開始: { userId: '42c1adb5-5ed4-4385-b58b-77f904ed40d2', localItemsCount: 1 }
+🚚 既存のカートをクリア（ローカルカート優先）
+prisma:query DELETE FROM "public"."CartItem" WHERE "public"."CartItem"."userId" = $1
+prisma:query BEGIN
+🔄 商品移行処理: { productId: '4d890e8f-3b92-46bd-a61a-2bb1cacfb62f', quantity: 1 }
+prisma:query SELECT "public"."Product"."id", "public"."Product"."name", "public"."Product"."description", "public"."Product"."price", "public"."Product"."image", "public"."Product"."categoryId", "public"."Product"."producerId", "public"."Product"."isActive", "public"."Product"."createdAt", "public"."Product"."updatedAt" FROM "public"."Product" WHERE ("public"."Product"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+prisma:query SELECT "public"."Inventory"."id", "public"."Inventory"."productId", "public"."Inventory"."quantity", "public"."Inventory"."reservedQty", "public"."Inventory"."minStock", "public"."Inventory"."maxStock", "public"."Inventory"."lastUpdated", "public"."Inventory"."createdAt" FROM "public"."Inventory" WHERE "public"."Inventory"."productId" IN ($1) OFFSET $2
+prisma:query INSERT INTO "public"."CartItem" ("id","userId","productId","quantity","createdAt","updatedAt") VALUES ($1,$2,$3,$4,$5,$6) RETURNING "public"."CartItem"."id", "public"."CartItem"."userId", "public"."CartItem"."productId", "public"."CartItem"."quantity", "public"."CartItem"."createdAt", "public"."CartItem"."updatedAt"
+✅ 商品移行成功: { productId: '4d890e8f-3b92-46bd-a61a-2bb1cacfb62f', quantity: 1 }
+prisma:query COMMIT
+🚚 カート移行完了: { total: 1, migrated: 1, failed: 0 }
+ POST /api/cart/migrate 200 in 3389ms
+prisma:query SELECT "public"."CartItem"."id", "public"."CartItem"."userId", "public"."CartItem"."productId", "public"."CartItem"."quantity", "public"."CartItem"."createdAt", "public"."CartItem"."updatedAt" FROM "public"."CartItem" WHERE "public"."CartItem"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."Product"."id", "public"."Product"."name", "public"."Product"."description", "public"."Product"."price", "public"."Product"."image", "public"."Product"."categoryId", "public"."Product"."producerId", "public"."Product"."isActive", "public"."Product"."createdAt", "public"."Product"."updatedAt" FROM "public"."Product" WHERE "public"."Product"."id" IN ($1) OFFSET $2
+ GET /shop/cart 200 in 83ms
+prisma:query SELECT "public"."Producer"."id", "public"."Producer"."name", "public"."Producer"."description", "public"."Producer"."address", "public"."Producer"."phone", "public"."Producer"."email", "public"."Producer"."createdAt", "public"."Producer"."updatedAt" FROM "public"."Producer" WHERE "public"."Producer"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."Inventory"."id", "public"."Inventory"."productId", "public"."Inventory"."quantity", "public"."Inventory"."reservedQty", "public"."Inventory"."minStock", "public"."Inventory"."maxStock", "public"."Inventory"."lastUpdated", "public"."Inventory"."createdAt" FROM "public"."Inventory" WHERE "public"."Inventory"."productId" IN ($1) OFFSET $2
+ GET /api/cart 200 in 1484ms
+prisma:query SELECT "public"."CartItem"."id", "public"."CartItem"."userId", "public"."CartItem"."productId", "public"."CartItem"."quantity", "public"."CartItem"."createdAt", "public"."CartItem"."updatedAt" FROM "public"."CartItem" WHERE "public"."CartItem"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."Product"."id", "public"."Product"."name", "public"."Product"."description", "public"."Product"."price", "public"."Product"."image", "public"."Product"."categoryId", "public"."Product"."producerId", "public"."Product"."isActive", "public"."Product"."createdAt", "public"."Product"."updatedAt" FROM "public"."Product" WHERE "public"."Product"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."Producer"."id", "public"."Producer"."name", "public"."Producer"."description", "public"."Producer"."address", "public"."Producer"."phone", "public"."Producer"."email", "public"."Producer"."createdAt", "public"."Producer"."updatedAt" FROM "public"."Producer" WHERE "public"."Producer"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."Inventory"."id", "public"."Inventory"."productId", "public"."Inventory"."quantity", "public"."Inventory"."reservedQty", "public"."Inventory"."minStock", "public"."Inventory"."maxStock", "public"."Inventory"."lastUpdated", "public"."Inventory"."createdAt" FROM "public"."Inventory" WHERE "public"."Inventory"."productId" IN ($1) OFFSET $2
+ GET /api/cart 200 in 1228ms
+prisma:query SELECT "public"."CartItem"."id", "public"."CartItem"."userId", "public"."CartItem"."productId", "public"."CartItem"."quantity", "public"."CartItem"."createdAt", "public"."CartItem"."updatedAt" FROM "public"."CartItem" WHERE "public"."CartItem"."userId" = $1 OFFSET $2
+prisma:query SELECT "public"."Product"."id", "public"."Product"."name", "public"."Product"."description", "public"."Product"."price", "public"."Product"."image", "public"."Product"."categoryId", "public"."Product"."producerId", "public"."Product"."isActive", "public"."Product"."createdAt", "public"."Product"."updatedAt" FROM "public"."Product" WHERE "public"."Product"."id" IN ($1) OFFSET $2
+prisma:query SELECT "public"."Producer"."id", "public"."Producer"."name", "public"."Producer"."description", "public"."Producer"."address", "public"."Producer"."phone", "public"."Producer"."email", "public"."Producer"."createdAt", "public"."Producer"."updatedAt" FROM "public"."Producer" WHERE "public"."Producer"."id" IN ($1) OFFSET $2
+ GET /api/cart 200 in 1496ms
+prisma:query SELECT "public"."Inventory"."id", "public"."Inventory"."productId", "public"."Inventory"."quantity", "public"."Inventory"."reservedQty", "public"."Inventory"."minStock", "public"."Inventory"."maxStock", "public"."Inventory"."lastUpdated", "public"."Inventory"."createdAt" FROM "public"."Inventory" WHERE "public"."Inventory"."productId" IN ($1) OFFSET $2
+ GET /shop/shipping 200 in 60ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 539ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 262ms
+ GET /shop/checkout?name=test5&phone=05058752903&address=%E9%8A%80%E5%BA%A7&postalCode=1040061&city=%E4%B8%AD%E5%A4%AE%E5%8C%BA&state=%E6%9D%B1%E4%BA%AC%E9%83%BD&email=customer5%40example.com&deliveryService=japanpost&shippingFee=800 200 in 46ms
+prisma:query SELECT 1
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 760ms
+Yamato Test Mode - Calculated rate: 600 for weight: 500
+Japan Post Test Mode - Calculated rate: 700 for weight: 500
+ POST /api/delivery/rates 200 in 25ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 342ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 414ms
+Yamato Test Mode - Calculated rate: 600 for weight: 500
+Japan Post Test Mode - Calculated rate: 700 for weight: 500
+ POST /api/delivery/rates 200 in 13ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 465ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 268ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 307ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 346ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 288ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 317ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 288ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 277ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 623ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 342ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 301ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 279ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 280ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 358ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 303ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 270ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 278ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 278ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 280ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 274ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 446ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 433ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 286ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 498ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 274ms
+[payments/checkout] creating session for order: { items: 1, currency: 'jpy', total: null }
+[payments/checkout] PAYMENT_PROVIDER env: stripe
+[payments/checkout] provider loaded: [ 'createCheckoutSession', 'verifyWebhook', 'handleWebhookEvent' ]
+[stripe] using appUrl for success/cancel urls: http://localhost:3000
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 426ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 269ms
+Stripe: 既存顧客を使用: cus_T4QXYyOYklUBIK
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 269ms
+Stripe: updated existing customer with new info cus_T4QXYyOYklUBIK
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 266ms
+Stripe: 既存顧客を使用: cus_T4QXYyOYklUBIK
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 271ms
+Stripe: updated existing customer with new info cus_T4QXYyOYklUBIK
+[stripe] sessionOptions preview: {
+  success_url: 'http://localhost:3000/shop/checkout/success?session_id={CHECKOUT_SESSION_ID}',
+  cancel_url: 'http://localhost:3000/shop/checkout/cancel'
+}
+ GET /api/user 200 in 276ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 273ms
+[payments/checkout] provider result: {
+  checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_b1PbgjTiRxLl2uT5M1BixjRWbdI3Mmw0OtYTT252lFlZqw0clHTQvn8yGS#fidkdWxOYHwnPyd1blpxYHZxWjA0VjZrXzZPdDx0XGpLNWBrMX1JPF9JcE89a2FgZzVkVGdGf1VJQH1TVjBwVjU9dGZkZnJGVHBmXzc2QjJTQ2t0MEhkPGZ1XDRMYmdSV2JkdzU9Z3xhXGpmNTVBT2FGTF01bCcpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl',
+  sessionId: 'cs_test_b1PbgjTiRxLl2uT5M1BixjRWbdI3Mmw0OtYTT252lFlZqw0clHTQvn8yGS'
+}
+ POST /api/payments/checkout 200 in 1994ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 269ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ GET /api/user 200 in 269ms
+ GET /api/user 200 in 71ms
+prisma:query SELECT "public"."User"."id", "public"."User"."name", "public"."User"."email", "public"."User"."phone", "public"."User"."address", "public"."User"."postalCode", "public"."User"."userType" FROM "public"."User" WHERE ("public"."User"."id" = $1 AND 1=1) LIMIT $2 OFFSET $3
+ ○ Compiling /shop/checkout/success ...
+ ✓ Compiled /shop/checkout/success in 670ms (1188 modules)
+🔄 CartProvider render: {
+  sessionId: '42c1adb5-5ed4-4385-b58b-77f904ed40d2',
+  status: 'authenticated',
+  itemsCount: 0,
+  lastSyncTime: 0,
+  hasInitialized: false,
+  syncInProgress: false
+}
+ GET /shop/checkout/success?session_id=cs_test_b1PbgjTiRxLl2uT5M1BixjRWbdI3Mmw0OtYTT252lFlZqw0clHTQvn8yGS 200 in 1621ms
+ ○ Compiling /api/cart ...
+ ✓ Compiled /api/cart in 545ms (905 modules)
+prisma:query SELECT 1
+prisma:query DELETE FROM "public"."CartItem" WHERE "public"."CartItem"."userId" = $1
+ DELETE /api/cart 200 in 1273ms
+prisma:query SELECT "public"."CartItem"."id", "public"."CartItem"."userId", "public"."CartItem"."productId", "public"."CartItem"."quantity", "public"."CartItem"."createdAt", "public"."CartItem"."updatedAt" FROM "public"."CartItem" WHERE "public"."CartItem"."userId" = $1 OFFSET $2
+ GET /api/cart 200 in 263ms
+ ✓ Compiled /api/auth/[...nextauth] in 466ms (876 modules)
+ GET /api/auth/session 200 in 625ms
+ GET /api/auth/session 200 in 77ms
+ ✓ Compiled /api/payments/checkout in 463ms (894 modules)
+[payments/checkout] creating session for order: { items: 1, currency: 'jpy', total: 1500 }
+[payments/checkout] PAYMENT_PROVIDER env: stripe
+[payments/checkout] provider loaded: [ 'createCheckoutSession', 'verifyWebhook', 'handleWebhookEvent' ]
+[stripe] using appUrl for success/cancel urls: http://localhost:3000
+[stripe] metadata.forceNewCard=true — skipping existing customer lookup and forcing new customer creation
+[stripe] sessionOptions preview: {
+  success_url: 'http://localhost:3000/shop/checkout/success?session_id={CHECKOUT_SESSION_ID}',
+  cancel_url: 'http://localhost:3000/shop/checkout/cancel'
+}
+[payments/checkout] provider result: {
+  checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_b18yKNzxdaWeSUd29tYmL1amdmz5zzjEnEEDN59iWUZnd9mDYvOP9UPeqz#fidkdWxOYHwnPyd1blpxYHZxWjA0VjZrXzZPdDx0XGpLNWBrMX1JPF9JcE89a2FgZzVkVGdGf1VJQH1TVjBwVjU9dGZkZnJGVHBmXzc2QjJTQ2t0MEhkPGZ1XDRMYmdSV2JkdzU9Z3xhXGpmNTVBT2FGTF01bCcpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl',
+  sessionId: 'cs_test_b18yKNzxdaWeSUd29tYmL1amdmz5zzjEnEEDN59iWUZnd9mDYvOP9UPeqz'
+}
+ POST /api/payments/checkout 200 in 1090ms
+ ✓ Compiled in 431ms (894 modules)
+[payments/checkout] creating session for order: { items: 1, currency: 'jpy', total: 1500 }
+[payments/checkout] PAYMENT_PROVIDER env: stripe
+[payments/checkout] provider loaded: [ 'createCheckoutSession', 'verifyWebhook', 'handleWebhookEvent' ]
+[stripe] using appUrl for success/cancel urls: http://localhost:3000
+[stripe] metadata.forceNewCard=true — skipping existing customer lookup and forcing new customer creation
+[stripe] sessionOptions preview: {
+  success_url: 'http://localhost:3000/shop/checkout/success?session_id={CHECKOUT_SESSION_ID}',
+  cancel_url: 'http://localhost:3000/shop/checkout/cancel',
+  customer: undefined,
+  customer_creation: 'always',
+  customer_email: undefined,
+  metadata: {
+    userEmail: 'customer2@example.com',
+    orderId: 'test-order-456',
+    weightGrams: '600',
+    postalCode: '3400203',
+    forceNewCard: 'true'
+  }
+}
+[payments/checkout] provider result: {
+  checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_b13jbCwDQQM07vFb7JbMGDJGXO5oVtDxhttwrvD1JtVhjUpwNycLUrmvFQ#fidkdWxOYHwnPyd1blpxYHZxWjA0VjZrXzZPdDx0XGpLNWBrMX1JPF9JcE89a2FgZzVkVGdGf1VJQH1TVjBwVjU9dGZkZnJGVHBmXzc2QjJTQ2t0MEhkPGZ1XDRMYmdSV2JkdzU9Z3xhXGpmNTVBT2FGTF01bCcpJ2N3amhWYHdzYHcnP3F3cGApJ2dkZm5id2pwa2FGamlqdyc%2FJyZjY2NjY2MnKSdpZHxqcHFRfHVgJz8naHBpcWxabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl',
+  sessionId: 'cs_test_b13jbCwDQQM07vFb7JbMGDJGXO5oVtDxhttwrvD1JtVhjUpwNycLUrmvFQ'
+}
+ POST /api/payments/checkout 200 in 579ms
+ ✓ Compiled in 1137ms (1154 modules)

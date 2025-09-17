@@ -5,6 +5,8 @@ import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
 export default function ShopSignUpPage() {
+  // (自動上書きに切り替え) ユーザー編集フラグは不要
+
   // 郵便番号から都道府県・市区郡自動セット
   const fetchAddressFromPostalCode = async (postalCode: string) => {
     try {
@@ -12,10 +14,17 @@ export default function ShopSignUpPage() {
       const data = await res.json()
       if (data && data.results && data.results.length > 0) {
         const result = data.results[0]
+        // Normalize address3: remove duplicated city prefix when present
+        let addr3 = result.address3 || ''
+        if (result.address2 && addr3.startsWith(result.address2)) {
+          addr3 = addr3.slice(result.address2.length).trim()
+        }
+        // Always overwrite state/city/address when postal code lookup runs
         setFormData(f => ({
           ...f,
           state: result.address1 || f.state,
-          city: result.address2 || f.city
+          city: result.address2 || f.city,
+          address: addr3 || f.address
         }))
       }
     } catch {
@@ -43,6 +52,7 @@ export default function ShopSignUpPage() {
       ...prev,
       [name]: value
     }))
+    // (自動上書き) ユーザー編集フラグは使わない
     // 郵便番号が7桁数字なら自動住所セット
     if (name === "postalCode" && /^[0-9]{7}$/.test(value)) {
       fetchAddressFromPostalCode(value)

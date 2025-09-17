@@ -5,7 +5,7 @@ This document explains how to test Stripe webhooks locally using the Stripe CLI 
 Prerequisites
 - `node` and `npm` installed
 - `stripe` CLI installed and logged in (https://stripe.com/docs/stripe-cli)
-- Local dev server running at `http://localhost:3000` (or change the forward target)
+- Local dev server running at `config.getBaseUrl()` (or change the forward target)
 
 1. Start the local server (production or dev)
 
@@ -20,7 +20,7 @@ npm run dev
 
 ```bash
 # From repo root
-./scripts/stripe-listen.sh http://localhost:3000/api/payments/webhook
+./scripts/stripe-listen.sh `config.getBaseUrl()`/api/payments/webhook
 ```
 
 The stripe CLI will print a line like:

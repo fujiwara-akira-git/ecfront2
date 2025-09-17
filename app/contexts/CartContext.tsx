@@ -136,7 +136,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       dispatch({ type: 'SET_LOADING', payload: true })
       console.log('📖 データベースからカート読み込み開始')
-      const response = await fetch('/api/cart')
+  const response = await fetch('/api/cart', { credentials: 'same-origin' })
       
       console.log('📖 カート読み込みレスポンス:', { 
         ok: response.ok, 
@@ -168,6 +168,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       const response = await fetch('/api/cart/migrate', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ localCartItems: state.items })
       })
@@ -363,6 +364,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('📡 APIリクエスト送信中...')
         const response = await fetch('/api/cart', {
           method: 'POST',
+          credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ productId: item.id, quantity: 1 })
         })
@@ -411,6 +413,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const response = await fetch(`/api/cart/${cartItem.id}`, {
           method: 'PUT',
+          credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ quantity })
         })
@@ -435,7 +438,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!cartItem) return
 
         const response = await fetch(`/api/cart/${cartItem.id}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          credentials: 'same-origin'
         })
 
         if (response.ok) {
@@ -454,7 +458,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (sessionUserId) {
       // ログイン済み: データベースをクリア
       try {
-        const response = await fetch('/api/cart', { method: 'DELETE' })
+  const response = await fetch('/api/cart', { method: 'DELETE', credentials: 'same-origin' })
         if (response.ok) {
           dispatch({ type: 'CLEAR_CART' })
         }

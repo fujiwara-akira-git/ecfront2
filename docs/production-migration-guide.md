@@ -46,7 +46,7 @@ JAPANPOST_CLIENT_SECRET=your_actual_japanpost_client_secret_here
 1. **テストモードでの動作確認**
    ```bash
    # テストモードで配送料計算をテスト
-   curl -X POST http://localhost:3000/api/delivery/rates \
+  curl -X POST `config.getBaseUrl()`/api/delivery/rates \
      -H "Content-Type: application/json" \
      -d '{
        "origin": "東京都中央区",
@@ -58,7 +58,7 @@ JAPANPOST_CLIENT_SECRET=your_actual_japanpost_client_secret_here
 2. **配送作成テスト**
    ```bash
    # テストモードで配送作成をテスト
-   curl -X POST http://localhost:3000/api/delivery/create \
+  curl -X POST `config.getBaseUrl()`/api/delivery/create \
      -H "Content-Type: application/json" \
      -d '{
        "courierId": "yamato",

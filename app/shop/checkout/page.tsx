@@ -28,6 +28,8 @@ export default function CheckoutPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
+  const [customerName, setCustomerName] = useState<string | null>('')
+  const [customerEmail, setCustomerEmail] = useState<string | null>('')
   const [shippingAddress, setShippingAddress] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [postalCode, setPostalCode] = useState('')
@@ -101,6 +103,8 @@ export default function CheckoutPage() {
             setShippingAddress(queryAddress || userData.address || '')
             setPhoneNumber(queryPhone || userData.phone || '')
             setPostalCode(queryPostalCode || userData.postalCode || '')
+            setCustomerName(searchParams.get('name') || userData.name || session?.user?.name || '')
+            setCustomerEmail(searchParams.get('email') || userData.email || session?.user?.email || '')
             setDeliveryService(queryDeliveryService)
             setShippingFee(queryShippingFee)
           }
@@ -113,6 +117,8 @@ export default function CheckoutPage() {
         setPhoneNumber(queryPhone)
         setPostalCode(queryPostalCode)
         setDeliveryService(queryDeliveryService)
+  setCustomerName(searchParams.get('name') || '')
+  setCustomerEmail(searchParams.get('email') || '')
       }
     }
     if (status === 'authenticated' || status === 'unauthenticated') {
@@ -156,6 +162,28 @@ export default function CheckoutPage() {
 
     setIsLoading(true)
     try {
+      // 住所正規化: zipcloud の address3 に都道府県/市区郡が重複している場合は先頭の重複部分を取り除く
+      const stateFromZip = searchParams.get('state') || ''
+      const cityFromZip = searchParams.get('city') || ''
+      const sanitizeAddress = (stateStr: string, cityStr: string, addr: string) => {
+        if (!addr) return addr
+        let s = addr.trim()
+        const city = cityStr.trim()
+        const state = stateStr.trim()
+        // 先頭に市区郡が重複している場合に削除
+        if (city && s.startsWith(city)) {
+          s = s.substring(city.length).trim()
+        }
+        // 先頭に都道府県が重複している場合に削除
+        if (state && s.startsWith(state)) {
+          s = s.substring(state.length).trim()
+        }
+        // 不要な先頭の区切り文字を削除
+        s = s.replace(/^[、\s\-ー〜~]+/, '')
+        return s
+      }
+
+      const normalizedAddress = sanitizeAddress(stateFromZip, cityFromZip, shippingAddress)
       // 注文データを構築（送料を含む）
       // ユーザー入力値を優先してcustomerInfoにセット
       const orderData = {
@@ -169,16 +197,17 @@ export default function CheckoutPage() {
         shippingFee: shippingFee, // 配送料を反映
         deliveryService: deliveryService, // 配送方法を反映
         customerInfo: {
-          address: shippingAddress,
+          address: normalizedAddress,
           postalCode: postalCode,
           phone: phoneNumber,
-          email: session?.user?.email || '',
-          name: session?.user?.name || '',
+          email: customerEmail || session?.user?.email || '',
+          name: customerName || session?.user?.name || '',
         },
         metadata: {
           userId: session?.user?.id || '',
           userName: session?.user?.name || '',
-          shippingAddress: shippingAddress,
+          userEmail: customerEmail || session?.user?.email || undefined,
+          shippingAddress: normalizedAddress,
           postalCode: postalCode,
           phoneNumber: phoneNumber,
           deliveryService: deliveryService,
@@ -333,6 +362,32 @@ export default function CheckoutPage() {
 
             <form className="space-y-4">
 
+              {/* 氏名 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">氏名</label>
+                <input
+                  type="text"
+                  value={customerName || ''}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder={userInfo?.name ? "データベースから取得した氏名が入力されています" : "山田 太郎"}
+                  required
+                />
+              </div>
+
+              {/* メール */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">メールアドレス</label>
+                <input
+                  type="email"
+                  value={customerEmail || ''}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder={userInfo?.email ? "データベースから取得したメールが入力されています" : "you@example.com"}
+                  required
+                />
+              </div>
+
               {/* 電話番号 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">電話番号</label>
@@ -345,7 +400,6 @@ export default function CheckoutPage() {
                   required
                 />
               </div>
-              {/* ...existing code... */}
               {/* 郵便番号 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">郵便番号</label>

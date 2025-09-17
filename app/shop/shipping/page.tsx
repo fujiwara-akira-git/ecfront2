@@ -12,11 +12,16 @@ export default function ShippingInfoPage() {
       const data = await res.json()
       if (data && data.results && data.results.length > 0) {
         const result = data.results[0]
+        // Normalize address3: if it starts with address2 (city), remove the duplicate prefix
+        let addr3 = result.address3 || "";
+        if (result.address2 && addr3.startsWith(result.address2)) {
+          addr3 = addr3.slice(result.address2.length).trim();
+        }
         setForm(f => ({
           ...f,
           state: result.address1 || f.state,
           city: result.address2 || f.city,
-          address: result.address3 ? `${result.address3}` : f.address
+          address: addr3 || f.address
         }))
       }
     } catch {

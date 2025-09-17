@@ -160,7 +160,7 @@ NEXTAUTH_URL=localhost:3000
 NEXTAUTH_URL=http://yourdomain.com/  # 末尾スラッシュは不要
 
 # 正解例
-NEXTAUTH_URL=http://localhost:3000   # 開発環境
+NEXTAUTH_URL=config.getBaseUrl()   # 開発環境
 NEXTAUTH_URL=https://yourdomain.com  # 本番環境（HTTPS必須）
 ```
 

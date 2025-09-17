@@ -200,6 +200,7 @@ export const stripeProvider: Provider = {
 
     // セッション作成のオプションを準備
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || config.NEXTAUTH_URL || config.getBaseUrl()).replace(/\/$/, '')
+    console.log('[stripe] using appUrl for success/cancel urls:', appUrl)
 
     // customer/customer_emailは初期化時に含めない
     const sessionOptions: Stripe.Checkout.SessionCreateParams = {
@@ -220,13 +221,21 @@ export const stripeProvider: Provider = {
 
     // 既存顧客の検索または新規作成
     let customerId: string | undefined
-    // ...既存顧客検索・新規作成処理...
 
-    // 顧客検索・新規作成処理の直後にcustomer/customer_emailをセット
-    if (order.metadata?.userEmail) {
+    // Respect forceNewCard metadata: when true, skip matching existing customers and force new customer creation
+    const forceNewCard = parseBooleanish(getMetadataValue(order.metadata, 'forceNewCard'))
+
+    // Decide flow based on flags and presence of userEmail
+    if (forceNewCard) {
+      console.log('[stripe] metadata.forceNewCard=true — skipping existing customer lookup and forcing new customer creation')
+      sessionOptions.customer_creation = 'always'
+      // Do not set customer_email to avoid linking to existing Stripe customers or saved cards
+      // sessionOptions.customer_email intentionally omitted when forcing new card
+    } else if (order.metadata && order.metadata.userEmail) {
       if (!stripe) {
         throw new Error('Stripe client not initialized: missing STRIPE_SECRET_KEY or initialization failed')
       }
+
       // メールアドレスで既存顧客を検索
       const existingCustomers = await stripe.customers.list({
         email: order.metadata.userEmail,
@@ -290,8 +299,8 @@ export const stripeProvider: Provider = {
         // 新規顧客の場合はcustomer_emailのみセット
         sessionOptions.customer_email = order.customerInfo?.email || order.metadata?.userEmail || ''
       }
+
       // カード情報の保存を有効化するかはフロントの saveCard フラグに従う
-      // order.metadata.saveCard は 'true'/'false' 文字列または boolean の可能性がある
       const saveCardFlag = parseBooleanish(getMetadataValue(order.metadata, 'saveCard'))
       if (saveCardFlag) {
         sessionOptions.payment_intent_data = {
@@ -299,87 +308,22 @@ export const stripeProvider: Provider = {
         }
       }
     } else {
-      // ゲストユーザーの場合は顧客作成のみ
+      // No userEmail: treat as guest and always create a new customer at checkout
       sessionOptions.customer_creation = 'always'
-      sessionOptions.customer_email = order.customerInfo?.email || order.metadata?.userEmail || ''
-    }
-    if (order.metadata?.userEmail) {
-      if (!stripe) {
-        throw new Error('Stripe client not initialized: missing STRIPE_SECRET_KEY or initialization failed')
-      }
-      // メールアドレスで既存顧客を検索
-      const existingCustomers = await stripe.customers.list({
-        email: order.metadata.userEmail,
-        limit: 1
-      })
-
-      if (existingCustomers.data.length > 0) {
-        // 既存顧客が見つかった場合
-        customerId = existingCustomers.data[0].id
-        console.log('Stripe: 既存顧客を使用:', customerId)
-        // 既存顧客の情報を最新化（住所・電話・氏名があれば更新）
-        try {
-          const updatePayload: Stripe.CustomerUpdateParams = {}
-          if (order.metadata?.userName || order.customerInfo?.name) updatePayload.name = order.metadata?.userName || order.customerInfo?.name
-          if (order.customerInfo?.phone) updatePayload.phone = order.customerInfo.phone
-          if (order.customerInfo?.address || order.customerInfo?.postalCode || order.customerInfo?.city || order.customerInfo?.state || order.customerInfo?.addressLine2) {
-            updatePayload.address = {
-              line1: order.customerInfo?.address || undefined,
-              line2: order.customerInfo?.addressLine2 || undefined,
-              postal_code: order.customerInfo?.postalCode || undefined,
-              city: order.customerInfo?.city || undefined,
-              state: order.customerInfo?.state || undefined,
-              country: 'JP'
-            }
-          }
-          if (Object.keys(updatePayload).length > 0) {
-            await stripe.customers.update(customerId, updatePayload)
-            console.log('Stripe: updated existing customer with new info', customerId)
-          }
-        } catch (updateErr) {
-          console.warn('[stripe] could not update existing customer info:', updateErr)
-        }
-      } else {
-        // 新規顧客を作成
-        const customer = await stripe.customers.create({
-          email: order.metadata.userEmail,
-          name: order.metadata.userName || order.customerInfo?.name,
-          phone: order.customerInfo?.phone,
-          address: (order.customerInfo?.address || order.customerInfo?.postalCode || order.customerInfo?.city || order.customerInfo?.state) ? {
-            line1: order.customerInfo?.address || undefined,
-            line2: order.customerInfo?.addressLine2 || undefined,
-            postal_code: order.customerInfo?.postalCode || undefined,
-            city: order.customerInfo?.city || undefined,
-            state: order.customerInfo?.state || undefined,
-            country: 'JP'
-          } : undefined,
-          metadata: {
-            userId: order.metadata.userId || '',
-            source: 'eagle-palace-ec'
-          }
-        })
-        customerId = customer.id
-        console.log('Stripe: 新規顧客を作成:', customerId)
-      }
-
-      // 顧客IDをセッションに設定
-      sessionOptions.customer = customerId
-      // カード情報の保存を有効化するかはフロントの saveCard フラグに従う
-      // order.metadata.saveCard は 'true'/'false' 文字列または boolean の可能性がある
-      const saveCardFlag = parseBooleanish(getMetadataValue(order.metadata, 'saveCard'))
-      if (saveCardFlag) {
-        sessionOptions.payment_intent_data = {
-          setup_future_usage: 'off_session'
-        }
-      }
-    } else {
-      // ゲストユーザーの場合は顧客作成のみ
-      sessionOptions.customer_creation = 'always'
+      sessionOptions.customer_email = order.customerInfo?.email || undefined
     }
 
     if (!stripe) {
       throw new Error('Stripe client not initialized: missing STRIPE_SECRET_KEY or initialization failed')
     }
+    console.log('[stripe] sessionOptions preview:', {
+      success_url: sessionOptions.success_url,
+      cancel_url: sessionOptions.cancel_url,
+      customer: (sessionOptions as any).customer,
+      customer_creation: (sessionOptions as any).customer_creation,
+      customer_email: (sessionOptions as any).customer_email,
+      metadata: sessionOptions.metadata
+    })
     const session = await stripe.checkout.sessions.create(sessionOptions)
 
     return { checkoutUrl: session.url || undefined, sessionId: session.id }
