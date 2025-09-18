@@ -39,6 +39,7 @@ model User {
   stripeCustomerId String? @unique  // Stripe顧客ID
   cartItems    CartItem[]
   orders       Order[]
+  favoriteProducers FavoriteProducer[]
 
   @@index([email])
   @@index([userType])
@@ -63,6 +64,7 @@ model Producer {
   email       String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  favoritedBy FavoriteProducer[]
   products    Product[]
 }
 
