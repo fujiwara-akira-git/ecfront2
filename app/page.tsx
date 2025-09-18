@@ -3,16 +3,7 @@ import HomeProducts from './components/HomeProducts'
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-lime-50 relative overflow-hidden">
-      {/* 管理画面入口（右上・小さく） */}
-      <div className="absolute top-4 right-4 z-20">
-        <a
-          href="/admin/auth/signin"
-          className="flex items-center gap-2 bg-gray-800 text-white px-3 py-2 rounded-xl text-sm font-medium shadow-lg hover:bg-gray-700 transition-all"
-        >
-          <span>⚙️</span>
-          <span className="hidden sm:inline">管理画面</span>
-        </a>
-      </div>
+      {/* 管理画面リンクは非表示 */}
 
       {/* ヒーローセクション */}
       <section className="min-h-screen flex items-center justify-center px-4">
