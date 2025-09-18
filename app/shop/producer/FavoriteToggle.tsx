@@ -40,7 +40,12 @@ export default function FavoriteToggle({ producerId, initial = false }: Props) {
   }
 
   return (
-    <button onClick={toggle} disabled={loading} className={`px-3 py-1 text-sm rounded ${fav ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+    <button
+      onClick={toggle}
+      disabled={loading}
+      aria-label="favorite-button"
+      data-testid="favorite-toggle"
+      className={`px-3 py-1 text-sm rounded ${fav ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
       {loading ? '処理中...' : fav ? 'お気に入り済み' : 'お気に入り'}
     </button>
   )

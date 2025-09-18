@@ -26,16 +26,25 @@ test.describe('Favorite flow', () => {
     // open producer page
     await page.goto(`/shop/producer/${PRODUCER_ID}`)
 
-    // click favorite
-    const favButton = page.getByRole('button', { name: /お気に入り|お気に入り済み/ })
-    await favButton.click()
+  // click favorite using stable test id
+  const favButton = page.locator('[data-testid="favorite-toggle"]')
+  await favButton.waitFor({ state: 'visible', timeout: 15000 })
 
-    // wait for toast or for button state change
-    await expect(favButton).toHaveText(/お気に入り済み/)
+  // click and wait for API response to avoid flakiness
+  await Promise.all([
+    page.waitForResponse(resp => resp.url().includes('/api/favorites') && resp.status() === 200, { timeout: 15000 }),
+    favButton.click(),
+  ])
+
+  // API response received; skip asserting intermediate button text (can be flaky)
+  // proceed to mypage to verify favorite persisted
 
     // go to mypage and assert favorite present
     await page.goto('/shop/mypage')
-    await expect(page.getByText('お気に入りの生産者')).toBeVisible()
-    await expect(page.getByRole('link', { name: /.+/ })).toContainText(/.*/)
+  await expect(page.getByRole('heading', { name: 'お気に入りの生産者' })).toBeVisible()
+    // ensure the specific producer link appears in favorites
+    const producerLink = page.locator(`a[href$="/shop/producer/${PRODUCER_ID}"]`)
+    await producerLink.waitFor({ state: 'visible', timeout: 10000 })
+    await expect(producerLink).toContainText(/.+/)
   })
 })

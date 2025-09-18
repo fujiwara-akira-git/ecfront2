@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import type { Session } from 'next-auth'
+import { runWithRetry } from '../../lib/dbWithRetry'
 
 export interface CartItem {
   id: string
@@ -136,7 +137,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       dispatch({ type: 'SET_LOADING', payload: true })
       console.log('📖 データベースからカート読み込み開始')
-  const response = await fetch('/api/cart', { credentials: 'same-origin' })
+  const response = await runWithRetry(() => fetch('/api/cart', { credentials: 'same-origin' }), { retries: 2 })
       
       console.log('📖 カート読み込みレスポンス:', { 
         ok: response.ok, 
@@ -166,12 +167,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       dispatch({ type: 'SET_LOADING', payload: true })
       console.log('🚚 ローカルカートのデータベース移行開始:', state.items.length, '件')
       
-      const response = await fetch('/api/cart/migrate', {
+      const response = await runWithRetry(() => fetch('/api/cart/migrate', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ localCartItems: state.items })
-      })
+      }), { retries: 2 })
 
       console.log('🚚 カート移行レスポンス:', { 
         ok: response.ok, 
@@ -362,12 +363,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // ログイン済み: データベースに保存
       try {
         console.log('📡 APIリクエスト送信中...')
-        const response = await fetch('/api/cart', {
+        const response = await runWithRetry(() => fetch('/api/cart', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ productId: item.id, quantity: 1 })
-        })
+        }), { retries: 2 })
 
         console.log('📡 APIレスポンス:', { 
           ok: response.ok, 
@@ -411,12 +412,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const cartItem = state.items.find(item => item.id === id)
         if (!cartItem) return
 
-        const response = await fetch(`/api/cart/${cartItem.id}`, {
+        const response = await runWithRetry(() => fetch(`/api/cart/${cartItem.id}`, {
           method: 'PUT',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ quantity })
-        })
+        }), { retries: 2 })
 
         if (response.ok) {
           dispatch({ type: 'UPDATE_QUANTITY', payload: { id, quantity } })
@@ -437,10 +438,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const cartItem = state.items.find(item => item.id === id)
         if (!cartItem) return
 
-        const response = await fetch(`/api/cart/${cartItem.id}`, {
+        const response = await runWithRetry(() => fetch(`/api/cart/${cartItem.id}`, {
           method: 'DELETE',
           credentials: 'same-origin'
-        })
+        }), { retries: 2 })
 
         if (response.ok) {
           dispatch({ type: 'REMOVE_ITEM', payload: { id } })
@@ -458,8 +459,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (sessionUserId) {
       // ログイン済み: データベースをクリア
       try {
-  const response = await fetch('/api/cart', { method: 'DELETE', credentials: 'same-origin' })
-        if (response.ok) {
+  const response = await runWithRetry(() => fetch('/api/cart', { method: 'DELETE', credentials: 'same-origin' }), { retries: 2 })
+    if (response.ok) {
           dispatch({ type: 'CLEAR_CART' })
         }
       } catch (error) {

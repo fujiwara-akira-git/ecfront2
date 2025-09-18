@@ -43,11 +43,16 @@ export default async function ProducerPage({ params }: Props) {
           {producer.address && <p className="mt-2 text-sm text-gray-600">住所: {producer.address}</p>}
           {producer.phone && <p className="mt-1 text-sm text-gray-600">電話: {producer.phone}</p>}
           {producer.email && <p className="mt-1 text-sm text-gray-600">メール: {producer.email}</p>}
-          {session?.user?.id && (
-            <div className="mt-4">
-              <FavoriteToggle producerId={producer.id} initial={!!(await prisma.favoriteProducer.findFirst({ where: { userId: session.user.id, producerId: producer.id } }))} />
-            </div>
-          )}
+          <div className="mt-4">
+            <FavoriteToggle
+              producerId={producer.id}
+              initial={
+                session && session.user
+                  ? !!(await prisma.favoriteProducer.findFirst({ where: { userId: session.user.id, producerId: producer.id } }))
+                  : false
+              }
+            />
+          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow-sm p-6">
