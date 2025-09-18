@@ -5,11 +5,8 @@ const fs = require('fs');
 // 環境変数で schema を切り替え
 let schema = process.env.PRISMA_SCHEMA;
 if (!schema) {
-  if (process.env.VERCEL === '1' || process.env.CI === '1') {
-    schema = path.join('prisma', 'schema.vercel.prisma');
-  } else {
-    schema = path.join('prisma', 'schema.prisma');
-  }
+  // 常に schema.prisma を使用
+  schema = path.join('prisma', 'schema.prisma');
 }
 
 // Minimal log for which schema is used
