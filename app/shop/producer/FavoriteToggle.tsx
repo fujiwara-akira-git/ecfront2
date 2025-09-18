@@ -1,13 +1,26 @@
 "use client"
 import { useState, useEffect } from 'react'
-import { useToast } from '@/app/contexts/ToastContext'
+import { showGlobalToast } from '@/app/contexts/ToastContext'
 
 type Props = { producerId: string; initial?: boolean }
 
 export default function FavoriteToggle({ producerId, initial = false }: Props) {
   const [fav, setFav] = useState<boolean>(initial)
   const [loading, setLoading] = useState(false)
-  const { showToast } = useToast()
+
+  // Use a safe toast function that works even if the ToastProvider
+  // hasn't mounted. `showGlobalToast` will queue messages until the
+  // provider registers; this prevents runtime `undefined` errors
+  // when the user is not logged in or in isolated test renders.
+  const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'success') => {
+    try {
+      showGlobalToast(message, type)
+    } catch (e) {
+      // best-effort: do not crash the app for toast failures
+      // eslint-disable-next-line no-console
+      console.warn('showToast failed', e)
+    }
+  }
 
   useEffect(() => setFav(initial), [initial])
 
@@ -16,6 +29,10 @@ export default function FavoriteToggle({ producerId, initial = false }: Props) {
     try {
       if (!fav) {
         const res = await fetch('/api/favorites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ producerId }) })
+        if (res.status === 401) {
+          showToast('ログインまたは新規登録してください', 'warning')
+          return
+        }
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
           throw new Error(body?.error || 'failed to add favorite')
@@ -24,6 +41,10 @@ export default function FavoriteToggle({ producerId, initial = false }: Props) {
         showToast('お気に入りに追加しました', 'success')
       } else {
         const res = await fetch(`/api/favorites/${producerId}`, { method: 'DELETE' })
+        if (res.status === 401) {
+          showToast('ログインまたは新規登録してください', 'warning')
+          return
+        }
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
           throw new Error(body?.error || 'failed to remove favorite')

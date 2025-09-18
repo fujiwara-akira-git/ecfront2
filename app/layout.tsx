@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { Noto_Sans_JP } from 'next/font/google'
+import { SessionProvider } from './components/SessionProvider'
+import { ToastProvider } from './contexts/ToastContext'
+import { CartProvider } from './contexts/CartContext'
 
 export const metadata: Metadata = {
   title: 'Eagle Palace - 道の駅・農産物直売所向け統合プラットフォーム',
@@ -18,13 +21,14 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  // Note: we fetch server session for SessionProvider initial value
+  // Keep this layout client-safe by using dynamic rendering for session when needed.
   return (
     <html lang="ja">
       <body 
         className={`${noto.className} antialiased bg-gray-50 text-gray-900`} 
         suppressHydrationWarning={true}
       >
-        {/* Remove attributes injected by browser extensions */}
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){
             try {
@@ -36,9 +40,14 @@ export default function RootLayout({
             } catch(e) {}
           })();
         ` }} />
-        
-        {/* ルート専用のシンプルレイアウト */}
-        {children}
+
+        <SessionProvider>
+          <ToastProvider>
+            <CartProvider>
+              {children}
+            </CartProvider>
+          </ToastProvider>
+        </SessionProvider>
       </body>
     </html>
   )

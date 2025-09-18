@@ -1,8 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { SessionProvider } from '../components/SessionProvider'
-import { CartProvider } from '../contexts/CartContext'
-import { ToastProvider } from '../contexts/ToastContext'
+// Providers moved to app/layout.tsx
 import CartBadge from '../components/CartBadge'
 import SignOutButton from '../components/SignOutButton'
 import { getServerSession, type Session } from 'next-auth'
@@ -34,10 +32,7 @@ export default async function ShopLayout({
   }
 
   return (
-    <SessionProvider session={session}>
-      <ToastProvider>
-        <CartProvider>
-          <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-gray-50">
             {/* ECショップ専用ヘッダー */}
             <header className="bg-white/95 backdrop-blur-sm border-b shadow-sm sticky top-0 z-50">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -147,8 +142,5 @@ export default async function ShopLayout({
               </div>
             </footer>
           </div>
-        </CartProvider>
-      </ToastProvider>
-    </SessionProvider>
   )
 }

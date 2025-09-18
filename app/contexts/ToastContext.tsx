@@ -18,6 +18,28 @@ interface ToastContextType {
   removeToast: (id: string) => void
 }
 
+// グローバルで安全にトーストを表示するための関数（ToastProvider によって登録される）
+let globalShowToast: ((message: string, type?: ToastType, duration?: number) => void) | null = null
+// Provider マウント前に呼ばれたトーストはここに溜める
+const pendingToasts: Array<{ message: string; type: ToastType; duration: number }> = []
+export function showGlobalToast(message: string, type: ToastType = 'success', duration = 3000) {
+  if (globalShowToast) {
+    try {
+      globalShowToast(message, type, duration)
+    } catch (e) {
+      console.warn('showGlobalToast invoke failed', e)
+    }
+  } else {
+    // Provider がまだ登録されていない場合はキューに入れておく
+    pendingToasts.push({ message, type, duration })
+  }
+}
+
+// Provider の登録状態を確認するためのヘルパ
+export function isGlobalToastRegistered() {
+  return !!globalShowToast
+}
+
 const ToastContext = createContext<ToastContextType | undefined>(undefined)
 
 export const useToast = () => {
@@ -42,7 +64,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
   const showToast = useCallback((message: string, type: ToastType = 'success', duration = 3000) => {
     const id = Date.now().toString()
     const newToast: Toast = { id, message, type, duration }
-    
+
     setToasts(prev => [...prev, newToast])
 
     // 自動削除
@@ -50,6 +72,29 @@ export function ToastProvider({ children }: ToastProviderProps) {
       removeToast(id)
     }, duration)
   }, [removeToast])
+
+  // Provider がマウントされた時にグローバル関数を登録し、アンマウント時に解除する
+  useEffect(() => {
+    globalShowToast = showToast
+    return () => {
+      globalShowToast = null
+    }
+  }, [showToast])
+  
+  // マウント時にキューに溜まったトーストをフラッシュする
+  useEffect(() => {
+    if (pendingToasts.length > 0) {
+      // flush queued toasts
+      pendingToasts.forEach((t) => {
+        try {
+          showToast(t.message, t.type, t.duration)
+        } catch (e) {
+          console.warn('Failed to flush pending toast', e)
+        }
+      })
+      pendingToasts.length = 0
+    }
+  }, [showToast])
 
   return (
     <ToastContext.Provider value={{ toasts, showToast, removeToast }}>
@@ -138,7 +183,6 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
         min-w-80 max-w-md px-4 py-3 rounded-lg shadow-lg border-l-4 
         transform transition-all duration-300 ease-in-out pointer-events-auto
         ${getToastStyles(toast.type)}
-        animate-slide-in-right
       `}
     >
       <div className="flex items-center justify-between">
@@ -149,6 +193,7 @@ function ToastItem({ toast, onRemove }: ToastItemProps) {
         <button
           onClick={() => onRemove(toast.id)}
           className="ml-3 text-white/80 hover:text-white focus:outline-none focus:text-white transition-colors"
+          aria-label="閉じる"
         >
           ✕
         </button>

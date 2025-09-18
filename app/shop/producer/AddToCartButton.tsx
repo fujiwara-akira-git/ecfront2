@@ -15,7 +15,11 @@ export default function AddToCartButton({ product, disabled }: { product: Produc
   const [loading, setLoading] = useState(false)
 
   const handleClick = async () => {
-    if (disabled || loading) return
+    console.log('🖱️ AddToCartButton clicked', { productId: product.id, disabled, loading })
+    if (disabled || loading) {
+      console.log('🖱️ Click ignored due to disabled/loading', { disabled, loading })
+      return
+    }
     setLoading(true)
     try {
       await addItem({

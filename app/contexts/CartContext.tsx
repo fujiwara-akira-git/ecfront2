@@ -4,6 +4,7 @@ import React, { createContext, useContext, useReducer, useEffect, useCallback, u
 import { useSession } from 'next-auth/react'
 import type { Session } from 'next-auth'
 import { runWithRetry } from '../../lib/dbWithRetry'
+import { showGlobalToast } from './ToastContext'
 
 export interface CartItem {
   id: string
@@ -351,12 +352,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [sessionUserId, loadCartFromDatabase])
 
   const addItem = useCallback(async (item: Omit<CartItem, 'quantity'>) => {
-    console.log('🛒 addItem呼び出し:', { 
-      productId: item.id, 
+    console.log('🛒 addItem呼び出し:', {
+      productId: item.id,
       productName: item.name,
       isLoggedIn: !!sessionUserId,
       sessionStatus: status,
-      currentItemsCount: state.items.length 
+      currentItemsCount: state.items.length,
+      timestamp: Date.now()
     })
     
     if (sessionUserId) {
@@ -400,8 +402,37 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } else {
       // 未ログイン: ローカルストレージに保存
-      console.log('💾 ローカルストレージに追加')
+      console.log('💾 ローカルストレージに追加 (unauthenticated)', { productId: item.id, productName: item.name })
       dispatch({ type: 'ADD_ITEM', payload: item })
+      try {
+        // ユーザに視覚フィードバックを出す（Provider が存在する場合のみ表示）
+        showGlobalToast('カートに追加しました（未ログインのため端末に保存されます）', 'success', 2500)
+
+        // ワークアラウンド: Provider が未登録の場合に備えて短時間後に再試行
+        //（ToastProvider が遅れてマウントされるケースを吸収する）
+        const attemptShowIfNotRegistered = () => {
+          try {
+            // lazy import helper to avoid circular imports
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const toast = require('./ToastContext')
+            if (toast && typeof toast.isGlobalToastRegistered === 'function' && !toast.isGlobalToastRegistered()) {
+              // 再試行: 少し待ってから強制的に呼ぶ
+              setTimeout(() => {
+                try {
+                  toast.showGlobalToast('カートに追加しました（未ログインのため端末に保存されます）', 'success', 2500)
+                } catch (e) {
+                  // ignore
+                }
+              }, 300)
+            }
+          } catch (e) {
+            // ignore require errors in exotic envs
+          }
+        }
+        attemptShowIfNotRegistered()
+      } catch (e) {
+        console.warn('Global toast show failed', e)
+      }
     }
   }, [sessionUserId, status, state.items.length, syncWithDatabase])
 
