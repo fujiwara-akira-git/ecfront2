@@ -9,7 +9,7 @@ export async function GET() {
 
     console.log('[vc-debug][env]', {
       hasNEXTAUTH_URL: !!nextAuthUrl,
-      NEXTAUTH_URL_preview: nextAuthUrl ? nextAuthUrl.replace(/(:\/\/)([^\/]+)(.*)/, '$1$2...') : null,
+  NEXTAUTH_URL_preview: nextAuthUrl ? nextAuthUrl.replace(/(:\/\/)([^/]+)(.*)/, '$1$2...') : null,
       hasNEXTAUTH_SECRET: nextAuthSecretPresent,
       hasDATABASE_URL: databaseUrlPresent
     })
