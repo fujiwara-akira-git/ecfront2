@@ -42,7 +42,7 @@ export default async function ShopLayout({
 
                   {/* デスクトップナビゲーション - 余裕のあるスペース */}
                   <nav className="hidden md:flex items-center space-x-12">
-                    <Link href="/shop" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors text-lg">ホーム</Link>
+                    <Link href="/" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors text-lg">ホーム</Link>
                     <Link href="/shop/products" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors text-lg">商品一覧</Link>
                     <Link href="/shop/producers" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors text-lg">生産者</Link>
                     <Link href="/shop/mypage" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors text-lg">マイページ</Link>
@@ -78,7 +78,7 @@ export default async function ShopLayout({
               <div className="md:hidden border-t bg-white">
                 <div className="max-w-7xl mx-auto px-6 py-4">
                   <nav className="flex justify-around">
-                    <Link href="/shop" className="flex flex-col items-center font-medium text-gray-600 hover:text-emerald-600 transition-colors">
+                    <Link href="/" className="flex flex-col items-center font-medium text-gray-600 hover:text-emerald-600 transition-colors">
                       <span className="text-2xl mb-2">🏠</span>
                       <span className="text-sm">ホーム</span>
                     </Link>
