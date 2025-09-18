@@ -13,6 +13,11 @@ export async function POST(req: Request) {
 
   try {
     const userId = session.user.id as string
+
+    // validate producer exists to avoid FK violations
+    const producer = await prisma.producer.findUnique({ where: { id: producerId } })
+    if (!producer) return NextResponse.json({ error: 'producer not found' }, { status: 404 })
+
     const fav = await prisma.favoriteProducer.upsert({
       where: { userId_producerId: { userId, producerId } },
       update: {},
@@ -21,6 +26,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, favorite: fav })
   } catch (err) {
     console.error('favorites POST error', err)
+    // handle Prisma foreign key error more clearly
+    // @ts-ignore
+    if (err && err.code === 'P2003') return NextResponse.json({ error: 'foreign key violation' }, { status: 400 })
     return NextResponse.json({ error: 'internal' }, { status: 500 })
   }
 }

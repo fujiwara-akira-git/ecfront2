@@ -1,11 +1,13 @@
 "use client"
 import { useState, useEffect } from 'react'
+import { useToast } from '@/app/contexts/ToastContext'
 
 type Props = { producerId: string; initial?: boolean }
 
 export default function FavoriteToggle({ producerId, initial = false }: Props) {
   const [fav, setFav] = useState<boolean>(initial)
   const [loading, setLoading] = useState(false)
+  const { showToast } = useToast()
 
   useEffect(() => setFav(initial), [initial])
 
@@ -14,15 +16,24 @@ export default function FavoriteToggle({ producerId, initial = false }: Props) {
     try {
       if (!fav) {
         const res = await fetch('/api/favorites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ producerId }) })
-        if (!res.ok) throw new Error('failed')
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error(body?.error || 'failed to add favorite')
+        }
         setFav(true)
+        showToast('お気に入りに追加しました', 'success')
       } else {
         const res = await fetch(`/api/favorites/${producerId}`, { method: 'DELETE' })
-        if (!res.ok) throw new Error('failed')
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          throw new Error(body?.error || 'failed to remove favorite')
+        }
         setFav(false)
+        showToast('お気に入りを解除しました', 'info')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('favorite toggle error', err)
+      showToast(err?.message || 'お気に入りの更新に失敗しました', 'error')
     } finally {
       setLoading(false)
     }
@@ -30,7 +41,7 @@ export default function FavoriteToggle({ producerId, initial = false }: Props) {
 
   return (
     <button onClick={toggle} disabled={loading} className={`px-3 py-1 text-sm rounded ${fav ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
-      {fav ? 'お気に入り済み' : 'お気に入り'}
+      {loading ? '処理中...' : fav ? 'お気に入り済み' : 'お気に入り'}
     </button>
   )
 }

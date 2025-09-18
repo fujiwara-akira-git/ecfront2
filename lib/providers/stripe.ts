@@ -1,6 +1,7 @@
 import Stripe from 'stripe'
 import { Provider, OrderInput } from './provider'
 import { prisma } from '../prisma'
+import { runWithRetry } from '@/lib/dbWithRetry'
 import config from '../config'
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY || ''
@@ -17,49 +18,10 @@ function stripeDebug(...args: unknown[]) {
   if (STRIPE_DEBUG) console.log('[stripe:debug]', ...args)
 }
 
-// Simple retry helper for transient DB/network errors
-function isTransientPrismaError(err: any): boolean {
-  if (!err) return false
-  const code = err.code || ''
-  const msg = (err.message || '').toString()
-  // Common transient errors: cannot reach DB, interactive transaction timeouts, unable to start transaction
-  if (code === 'P1001') return true
-  if (msg.includes('Transaction API error')) return true
-  if (msg.includes('Unable to start a transaction')) return true
-  if (msg.includes('Transaction already closed')) return true
-  if (msg.includes("Can't reach database server")) return true
-  return false
-}
-
-async function withRetries<T>(fn: () => Promise<T>, attempts = 3, baseDelay = 200): Promise<T> {
-  let attempt = 0
-  while (true) {
-    try {
-      return await fn()
-    } catch (err: any) {
-      attempt++
-      const transient = isTransientPrismaError(err)
-      console.log(`[stripe][retry] attempt ${attempt}/${attempts}, transient=${transient}, error:`, {
-        code: err?.code,
-        message: err?.message,
-        meta: err?.meta,
-        timestamp: new Date().toISOString()
-      })
-
-      if (!transient || attempt >= attempts) {
-        console.error(`[stripe][retry] final failure after ${attempt} attempts:`, {
-          code: err?.code,
-          message: err?.message,
-          stack: err?.stack,
-          timestamp: new Date().toISOString()
-        })
-        throw err
-      }
-      const delay = baseDelay * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 100)
-      console.warn(`[stripe][retry] transient error, attempt ${attempt}/${attempts}, retrying after ${delay}ms`, err?.message)
-      await new Promise((res) => setTimeout(res, delay))
-    }
-  }
+// Delegate retry logic to shared runWithRetry helper. Keep a thin adapter so
+// existing call sites using `withRetries(fn)` continue to work.
+async function withRetries<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  return runWithRetry(fn, { retries: attempts })
 }
 
 // Helpers for safe metadata and value parsing

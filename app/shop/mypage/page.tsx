@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../api/auth/options'
 import { prisma } from '@/lib/prisma'
+import type { Order, FavoriteProducer, Producer } from '@prisma/client'
 
 export default async function MyPage() {
   const session = await getServerSession(authOptions)
@@ -21,7 +22,7 @@ export default async function MyPage() {
   }
 
   // Try to load recent orders for this user (if order model exists)
-  let orders: any[] = []
+  let orders: Order[] = []
   try {
     orders = await prisma.order.findMany({ where: { userId: session.user.id }, orderBy: { createdAt: 'desc' }, take: 10 })
   } catch (err) {
@@ -32,9 +33,9 @@ export default async function MyPage() {
   }
 
   // Try to load favorite producers (if model exists)
-  let favorites: any[] = []
+  let favorites: (FavoriteProducer & { producer: Producer })[] = []
   try {
-    favorites = await (prisma as any).favoriteProducer.findMany({ where: { userId: session.user.id }, include: { producer: true } })
+    favorites = await prisma.favoriteProducer.findMany({ where: { userId: session.user.id }, include: { producer: true } })
   } catch (err) {
     // model might not exist yet; ignore
     // eslint-disable-next-line no-console
