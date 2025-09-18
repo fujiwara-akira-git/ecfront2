@@ -25,8 +25,8 @@ export default async function AdminLayout({
         <header className="bg-slate-800 text-white shadow-lg">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
-              {/* 管理画面ロゴ */}
-              <a href="/admin" className="flex items-center gap-3">
+              {/* 管理画面ロゴ（表示のみ、リンク削除） */}
+              <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg">
                   EP
                 </div>
@@ -34,28 +34,16 @@ export default async function AdminLayout({
                   <div className="text-xl font-bold">Eagle Palace</div>
                   <div className="text-xs text-blue-300 font-medium">管理システム</div>
                 </div>
-              </a>
+              </div>
 
-              {/* 管理画面ナビゲーション */}
+              {/* 管理ナビは非表示（リンク削除） */}
               <nav className="hidden md:flex items-center space-x-6">
-                <a href="/admin" className="text-slate-300 hover:text-white font-medium transition-colors">
-                  ダッシュボード
-                </a>
-                <a href="/admin/products" className="text-slate-300 hover:text-white font-medium transition-colors">
-                  商品管理
-                </a>
-                <a href="/admin/inventory" className="text-slate-300 hover:text-white font-medium transition-colors">
-                  在庫管理
-                </a>
-                <a href="/admin/pos" className="text-slate-300 hover:text-white font-medium transition-colors">
-                  店舗販売
-                </a>
-                <a href="/admin/partners" className="text-slate-300 hover:text-white font-medium transition-colors">
-                  取引先管理
-                </a>
-                <a href="/admin/accounting" className="text-slate-300 hover:text-white font-medium transition-colors">
-                  経理処理
-                </a>
+                <span className="text-slate-300 font-medium">ダッシュボード</span>
+                <span className="text-slate-300 font-medium">商品管理</span>
+                <span className="text-slate-300 font-medium">在庫管理</span>
+                <span className="text-slate-300 font-medium">店舗販売</span>
+                <span className="text-slate-300 font-medium">取引先管理</span>
+                <span className="text-slate-300 font-medium">経理処理</span>
               </nav>
 
               {/* ユーザー情報 */}
@@ -80,50 +68,19 @@ export default async function AdminLayout({
                     </SignOutButton>
                   </div>
                 ) : (
-                  <a 
-                    href="/admin/auth/signin" 
+                  <button
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                    disabled
+                    title="管理画面は利用不可"
                   >
                     管理者ログイン
-                  </a>
+                  </button>
                 )}
               </div>
             </div>
           </div>
 
-          {/* モバイルナビゲーション */}
-          <div className="md:hidden border-t border-slate-700">
-            <div className="max-w-7xl mx-auto px-4 py-3">
-              <nav className="flex justify-around">
-                <a href="/admin" className="flex flex-col items-center text-xs font-medium text-slate-300">
-                  <span className="mb-1">📊</span>
-                  ダッシュボード
-                </a>
-                <a href="/admin/products" className="flex flex-col items-center text-xs font-medium text-slate-300">
-                  <span className="mb-1">📦</span>
-                  商品管理
-                </a>
-                <a href="/admin/inventory" className="flex flex-col items-center text-xs font-medium text-slate-300">
-                  <span className="mb-1">�</span>
-                  在庫管理
-                </a>
-                <a href="/admin/pos" className="flex flex-col items-center text-xs font-medium text-slate-300">
-                  <span className="mb-1">💳</span>
-                  店舗販売
-                </a>
-              </nav>
-              <nav className="flex justify-around mt-2">
-                <a href="/admin/partners" className="flex flex-col items-center text-xs font-medium text-slate-300">
-                  <span className="mb-1">🤝</span>
-                  取引先管理
-                </a>
-                <a href="/admin/accounting" className="flex flex-col items-center text-xs font-medium text-slate-300">
-                  <span className="mb-1">💰</span>
-                  経理処理
-                </a>
-              </nav>
-            </div>
-          </div>
+              {/* モバイルナビは非表示 */}
         </header>
 
         {/* サイドバーとメインコンテンツ */}
@@ -133,48 +90,30 @@ export default async function AdminLayout({
             <div className="w-64 bg-white border-r border-gray-200">
               <nav className="mt-5 px-2">
                 <div className="space-y-1">
-                  <a 
-                    href="/admin" 
-                    className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-900 hover:bg-gray-50"
-                  >
+                  <div className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-900">
                     <span className="mr-3">📊</span>
                     ダッシュボード
-                  </a>
-                  <a 
-                    href="/admin/products" 
-                    className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  >
+                  </div>
+                  <div className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600">
                     <span className="mr-3">📦</span>
                     商品管理
-                  </a>
-                  <a 
-                    href="/admin/inventory" 
-                    className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  >
+                  </div>
+                  <div className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600">
                     <span className="mr-3">�</span>
                     在庫管理
-                  </a>
-                  <a 
-                    href="/admin/pos" 
-                    className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  >
+                  </div>
+                  <div className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600">
                     <span className="mr-3">💳</span>
                     店舗販売(POS)
-                  </a>
-                  <a 
-                    href="/admin/partners" 
-                    className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  >
+                  </div>
+                  <div className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600">
                     <span className="mr-3">🤝</span>
                     取引先管理
-                  </a>
-                  <a 
-                    href="/admin/accounting" 
-                    className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  >
+                  </div>
+                  <div className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600">
                     <span className="mr-3">�</span>
                     経理処理(freee)
-                  </a>
+                  </div>
                 </div>
 
                 <div className="mt-8">
