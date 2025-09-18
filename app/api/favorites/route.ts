@@ -26,9 +26,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, favorite: fav })
   } catch (err) {
     console.error('favorites POST error', err)
-    // handle Prisma foreign key error more clearly
-    // @ts-ignore
-    if (err && err.code === 'P2003') return NextResponse.json({ error: 'foreign key violation' }, { status: 400 })
+  // handle Prisma foreign key error more clearly
+  // @ts-expect-error - err may be any, check for Prisma error code
+  if (err && err.code === 'P2003') return NextResponse.json({ error: 'foreign key violation' }, { status: 400 })
     return NextResponse.json({ error: 'internal' }, { status: 500 })
   }
 }

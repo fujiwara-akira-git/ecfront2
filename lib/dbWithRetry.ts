@@ -1,5 +1,3 @@
-import { Prisma } from '@prisma/client'
-
 type AsyncFn<T> = () => Promise<T>
 
 function isTransientPrismaError(err: any) {
