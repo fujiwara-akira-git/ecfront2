@@ -28,9 +28,15 @@ function SignInForm() {
         redirect: false
       })
 
-      console.log('ログイン結果:', result)
+      try {
+        console.log('ログイン結果 (raw):', result)
+        console.log('ログイン結果 (詳細):', JSON.stringify(result))
+      } catch (e) {
+        console.log('ログイン結果 (stringify error)', e)
+      }
 
       if (result?.error) {
+        console.log('login error details:', { error: result.error, status: result.status, ok: result.ok, url: result.url })
         setError('ログインに失敗しました。メールアドレスとパスワードを確認してください。')
       } else if (result?.ok) {
         console.log('ログイン成功、リダイレクト先:', returnTo)
