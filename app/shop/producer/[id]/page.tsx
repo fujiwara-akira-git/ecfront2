@@ -65,16 +65,23 @@ export default async function ProducerPage({ params }: Props) {
                 const qty = p.inventory?.quantity ?? 0
                 const isOut = qty <= 0
                 let imgSrc = '/images/placeholder.svg'
-                if (typeof p.image === 'string') {
-                  const s = p.image.trim()
-                  // only accept absolute http(s) or root-relative paths
-                  if (s.startsWith('/') || s.match(/^https?:\/\//i)) {
-                    imgSrc = s
-                  } else {
-                    // log suspicious image values for investigation (include product id)
-                    console.warn('[ProducerPage] invalid product.image for product', p.id, ', using placeholder:', s)
-                  }
+
+                // Validate image field: only accept root-relative or absolute http(s) URLs
+                function isValidImagePath(val: unknown) {
+                  if (typeof val !== 'string') return false
+                  const s = val.trim()
+                  if (!s) return false
+                  if (s.startsWith('/') || /^https?:\/\//i.test(s)) return true
+                  return false
                 }
+
+                if (isValidImagePath(p.image)) {
+                  imgSrc = (p.image as string).trim()
+                } else if (typeof p.image === 'string' && p.image.trim() !== '') {
+                  // record suspicious values for later DB cleanup
+                  console.warn('[ProducerPage] invalid product.image for product', p.id, ', using placeholder:', p.image)
+                }
+
                 return (
                   <div key={p.id} className={`flex items-center gap-3 border rounded-lg p-3 ${isOut ? 'opacity-60' : ''}`}>
                     <Link href={`/shop/products/${p.id}`} className="flex items-center gap-3 flex-1">
