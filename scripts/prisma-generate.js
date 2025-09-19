@@ -2,41 +2,41 @@ const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-// 環境変数で schema を切り替え
+// Determine schema path (can be overridden by PRISMA_SCHEMA env)
 let schema = process.env.PRISMA_SCHEMA;
 if (!schema) {
-  // 常に schema.prisma を使用
   schema = path.join('prisma', 'schema.prisma');
 }
 
-// Minimal log for which schema is used
 console.log(`[prisma-generate] Using schema: ${schema}`);
-// If project already contains a generated prisma client with a matching engine, skip generate.
+
+// Primary flow: always run `npx prisma generate` to ensure generated client matches schema
 try {
-  const enginePath = path.join(process.cwd(), '.prisma', 'client', 'libquery_engine-rhel-openssl-3.0.x.so.node');
-  if (fs.existsSync(enginePath)) {
-    console.log('[prisma-generate] Found bundled rhel engine at', enginePath, '- installing bundled client into node_modules');
-    try {
-      const src = path.join(process.cwd(), '.prisma', 'client')
-      const dest = path.join(process.cwd(), 'node_modules', '@prisma', 'client')
-      // ensure destination exists
-      fs.mkdirSync(dest, { recursive: true })
-      // copy files recursively
-      fs.cpSync(src, dest, { recursive: true })
-      console.log('[prisma-generate] Copied bundled prisma client to', dest)
-      process.exit(0)
-    } catch (copyErr) {
-      console.error('[prisma-generate] Failed to copy bundled client:', copyErr)
-      // fallthrough to attempt running generate
-    }
-  }
-} catch (e) {
-  // ignore
-}
-try {
+  console.log('[prisma-generate] Running `npx prisma generate`...');
   execSync(`npx prisma generate --schema=${schema}`, { stdio: 'inherit' });
-} catch (e) {
-  console.error('[prisma-generate] Failed to generate Prisma client.');
-  if (e && e.message) console.error(e.message);
-  process.exit(1);
+  console.log('[prisma-generate] Prisma client generated successfully.');
+  process.exit(0);
+} catch (genErr) {
+  console.error('[prisma-generate] `prisma generate` failed:', genErr && genErr.message ? genErr.message : genErr);
+  console.warn('[prisma-generate] Attempting fallback: copy bundled client from .prisma/client if present. This is NOT recommended and only a best-effort fallback.');
+
+  try {
+    const src = path.join(process.cwd(), '.prisma', 'client');
+    const dest = path.join(process.cwd(), 'node_modules', '@prisma', 'client');
+    if (fs.existsSync(src)) {
+      // Ensure destination directory exists
+      fs.mkdirSync(dest, { recursive: true });
+      console.log('[prisma-generate] Copying bundled client from', src, 'to', dest);
+      // Use a safe recursive copy
+      fs.cpSync(src, dest, { recursive: true });
+      console.log('[prisma-generate] Fallback copy completed. NOTE: Verify the client versions match your runtime.');
+      process.exit(0);
+    } else {
+      console.error('[prisma-generate] No bundled client found at', src, '- cannot fallback.');
+      process.exit(1);
+    }
+  } catch (copyErr) {
+    console.error('[prisma-generate] Fallback copy failed:', copyErr && copyErr.message ? copyErr.message : copyErr);
+    process.exit(1);
+  }
 }
