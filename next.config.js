@@ -19,26 +19,18 @@ const nextConfig = {
     // Only apply this override for local / non-Vercel environments.
     // On Vercel (process.env.VERCEL === '1') we keep default behavior.
     if (process.env.VERCEL === '1') return []
-
-    // For HTML requests, set short/no-cache so local browsers don't keep old prerendered HTML.
-    return [
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'header',
-            key: 'accept',
-            value: 'text/html',
-          },
-        ],
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'private, no-cache, no-store, max-age=0, must-revalidate',
-          },
-        ],
-      },
-    ]
+    // Apply explicit overrides for known prerendered HTML routes used in this app.
+    // Keep this scoped to local dev by returning early on Vercel.
+    const routes = ['/', '/auth/signup', '/_not-found']
+    return routes.map((r) => ({
+      source: r,
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'private, no-cache, no-store, max-age=0, must-revalidate',
+        },
+      ],
+    }))
   },
 }
 
