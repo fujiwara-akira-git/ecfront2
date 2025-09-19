@@ -10,6 +10,8 @@ if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL is not defined. Please set DATABASE_URL in your environment before starting the server.')
 }
 
+// Diagnostic logging removed to avoid leaking credentials in production logs.
+
 const client = global.__prisma ?? (global.__prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['warn', 'error'],
   datasources: {
