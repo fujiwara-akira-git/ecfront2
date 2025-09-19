@@ -20,7 +20,14 @@ export const authOptions: NextAuthOptions = {
         const { email, password } = credentials
 
         try {
+          // 部分的に環境をログ（秘密は出さない）
+          console.log('[auth][authorize] env', {
+            NEXTAUTH_URL: process.env.NEXTAUTH_URL ? String(process.env.NEXTAUTH_URL).slice(0, 40) : undefined,
+            DATABASE_URL: process.env.DATABASE_URL ? String(process.env.DATABASE_URL).slice(0, 40) : undefined,
+          })
+
           // データベースからユーザーを検索
+          console.log('[auth][authorize] querying user by email', { email })
           const user = await prisma.user.findUnique({ where: { email } })
 
           console.log('[auth][authorize] lookup', { email, found: !!user, userId: user?.id ?? null, hasPassword: !!user?.password })
@@ -51,7 +58,9 @@ export const authOptions: NextAuthOptions = {
             role,
           }
         } catch (error) {
-          console.error('認証エラー:', error)
+          const e: any = error
+          console.error('認証エラー:', e?.message || e)
+          if (e?.stack) console.error(e.stack)
           return null
         }
       }
