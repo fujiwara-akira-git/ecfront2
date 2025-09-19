@@ -32,6 +32,7 @@ model User {
   userType          String             @default("customer")
   postalCode        String?
   stripeCustomerId  String?            @unique
+  state             String?
   cartItems         CartItem[]
   favoriteProducers FavoriteProducer[]
   orders            Order[]
