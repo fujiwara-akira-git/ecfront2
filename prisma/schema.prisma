@@ -116,6 +116,7 @@ model Order {
   shippingMethod  String?
   subtotal        Int
   totalAmount     Int
+  postalCode      String?
   trackingNumber  String?
   user            User?       @relation(fields: [userId], references: [id])
   orderItems      OrderItem[]
