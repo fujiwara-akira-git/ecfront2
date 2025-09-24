@@ -1,0 +1,201 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["debian-openssl-1.1.x", "darwin-arm64"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model StripeEvent {
+  id          String    @id @db.VarChar(64)
+  type        String
+  payload     Json
+  processed   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([type])
+}
+
+model User {
+  id                String             @id @default(uuid())
+  firebaseUid       String?            @unique
+  email             String?            @unique
+  createdAt         DateTime           @default(now())
+  address           String?
+  name              String?
+  password          String?
+  phone             String?
+  updatedAt         DateTime           @updatedAt
+  userType          String             @default("customer")
+  postalCode        String?
+  stripeCustomerId  String?            @unique
+  state             String?
+  cartItems         CartItem[]
+  favoriteProducers FavoriteProducer[]
+  orders            Order[]
+
+  @@index([email])
+  @@index([userType])
+  @@index([stripeCustomerId])
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+}
+
+model Producer {
+  id          String             @id @default(uuid())
+  name        String             @unique
+  description String?
+  address     String?
+  phone       String?
+  email       String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  favoritedBy FavoriteProducer[]
+  products    Product[]
+}
+
+model Product {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  price       Int
+  image       String?
+  categoryId  String?
+  producerId  String?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  cartItems   CartItem[]
+  inventory   Inventory?
+  orderItems  OrderItem[]
+  category    Category?   @relation(fields: [categoryId], references: [id])
+  producer    Producer?   @relation(fields: [producerId], references: [id])
+
+  @@index([categoryId])
+  @@index([producerId])
+  @@index([isActive])
+}
+
+model Inventory {
+  id          String   @id @default(uuid())
+  productId   String   @unique
+  quantity    Int      @default(0)
+  reservedQty Int      @default(0)
+  minStock    Int      @default(0)
+  maxStock    Int?
+  lastUpdated DateTime @updatedAt
+  createdAt   DateTime @default(now())
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([quantity])
+}
+
+model Order {
+  id              String      @id @default(uuid())
+  userId          String?
+  currency        String      @default("jpy")
+  status          String      @default("pending")
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  customerEmail   String
+  customerName    String
+  customerPhone   String
+  notes           String?
+  shippingAddress String
+  shippingFee     Int         @default(0)
+  shippingMethod  String?
+  subtotal        Int
+  totalAmount     Int
+  trackingNumber  String?
+  user            User?       @relation(fields: [userId], references: [id])
+  orderItems      OrderItem[]
+  payments        Payment[]
+
+  @@index([status])
+  @@index([userId])
+  @@index([customerEmail])
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  orderId    String
+  productId  String
+  quantity   Int
+  unitPrice  Int
+  totalPrice Int
+  createdAt  DateTime @default(now())
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  orderId       String
+  stripeId      String?
+  amount        Int
+  currency      String
+  status        String
+  createdAt     DateTime @default(now())
+  paymentMethod String?
+  updatedAt     DateTime @updatedAt
+  order         Order    @relation(fields: [orderId], references: [id])
+
+  @@index([status])
+  @@index([stripeId])
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  userId    String
+  productId String
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([productId])
+}
+
+model Delivery {
+  id             String   @id @default(uuid())
+  orderId        String?
+  courierId      String
+  serviceCode    String
+  trackingNumber String?
+  status         String   @default("pending")
+  raw            Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([courierId])
+}
+
+model FavoriteProducer {
+  id         String   @id @default(uuid()) @db.VarChar(255)
+  userId     String   @db.VarChar(255)
+  producerId String   @db.VarChar(255)
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  producer   Producer @relation(fields: [producerId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FavoriteProducer_producer_fkey")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FavoriteProducer_user_fkey")
+
+  @@unique([userId, producerId])
+  @@index([userId])
+  @@index([producerId])
+}

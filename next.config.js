@@ -19,22 +19,28 @@ const nextConfig = {
     // Only apply this override for local / non-Vercel environments.
     // On Vercel (process.env.VERCEL === '1') we keep default behavior.
     if (process.env.VERCEL === '1') return []
-
     // Try to read prerender manifest produced by Next to get all prerendered routes.
     const fs = require('fs')
     const manifestPath = path.resolve(__dirname, '.next', 'prerender-manifest.json')
-    let routes = ['/', '/auth/signup', '/_not-found']
+
+    // Extra local-only routes to always include (easy to edit)
+    const extraLocalCacheControlRoutes = ['/', '/auth/signup', '/_not-found']
+
+    let manifestRoutes = []
     try {
       if (fs.existsSync(manifestPath)) {
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
-        routes = Object.keys(manifest.routes || {})
+        manifestRoutes = Object.keys(manifest.routes || {})
       }
     } catch (e) {
-      // fallback to default short list above
-      console.warn('[next.config] could not read prerender-manifest.json, falling back to default routes')
+      // fallback to empty manifestRoutes; we'll still use extraLocalCacheControlRoutes
+      console.warn('[next.config] could not read prerender-manifest.json, falling back to extraLocalCacheControlRoutes')
     }
 
-    return routes.map((r) => ({
+    // merge manifest routes with extra routes and dedupe
+    const allRoutes = Array.from(new Set([...manifestRoutes, ...extraLocalCacheControlRoutes]))
+
+    return allRoutes.map((r) => ({
       source: r,
       headers: [
         {

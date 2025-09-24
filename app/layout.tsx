@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { Noto_Sans_JP } from 'next/font/google'
 import { SessionProvider } from './components/SessionProvider'
+import { getServerSession, type Session } from 'next-auth'
+import { authOptions } from './api/auth/options'
 import { ToastProvider } from './contexts/ToastContext'
 import { CartProvider } from './contexts/CartContext'
 
@@ -16,12 +18,23 @@ const noto = Noto_Sans_JP({
   display: 'swap',
 })
 
-export default function RootLayout({ 
+export default async function RootLayout({ 
   children,
 }: {
   children: React.ReactNode
 }) {
   // Note: we fetch server session for SessionProvider initial value
+  // This layout runs on the server so we can call getServerSession
+  let session: Session | null = null
+  try {
+    session = await getServerSession(authOptions)
+  } catch (err) {
+    // Ensure we don't crash the app if session retrieval fails
+    // eslint-disable-next-line no-console
+    console.error('[next-auth][error][getServerSession]', err)
+    session = null
+  }
+
   // Keep this layout client-safe by using dynamic rendering for session when needed.
   return (
     <html lang="ja">
@@ -41,7 +54,7 @@ export default function RootLayout({
           })();
         ` }} />
 
-        <SessionProvider>
+        <SessionProvider session={session}>
           <ToastProvider>
             <CartProvider>
               {children}

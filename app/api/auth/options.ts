@@ -17,7 +17,12 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        const { email, password } = credentials
+        let { email } = credentials
+        const { password } = credentials
+        // 正規化: 登録時と同じルールで比較する
+        if (typeof email === 'string') {
+          email = email.trim().toLowerCase()
+        }
 
         try {
           // 部分的に環境をログ（秘密は出さない）

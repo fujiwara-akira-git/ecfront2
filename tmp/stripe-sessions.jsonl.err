@@ -1,0 +1,14 @@
+ERROR: No such checkout.session: cs_test_0krnijaobyne
+ERROR fetching cs_test_0krnijaobyne (rc=2)
+ERROR: No such checkout.session: cs_test_123
+ERROR fetching cs_test_123 (rc=2)
+ERROR: No such checkout.session: cs_test_6wcfbreik9t
+ERROR fetching cs_test_6wcfbreik9t (rc=2)
+ERROR: No such checkout.session: cs_test_f91r1wryztn
+ERROR fetching cs_test_f91r1wryztn (rc=2)
+ERROR: No such checkout.session: cs_test_fzf8nxmpmn
+ERROR fetching cs_test_fzf8nxmpmn (rc=2)
+ERROR: No such checkout.session: cs_test_rv4jxg52p9
+ERROR fetching cs_test_rv4jxg52p9 (rc=2)
+ERROR: No such checkout.session: cs_test_y2cdgf643zk
+ERROR fetching cs_test_y2cdgf643zk (rc=2)

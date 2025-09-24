@@ -1,3 +1,5 @@
+import Stripe from 'stripe'
+
 export type OrderItem = {
   sku: string
   name?: string
@@ -28,8 +30,8 @@ export type OrderInput = {
 
 export interface Provider {
   createCheckoutSession(order: OrderInput): Promise<{ checkoutUrl?: string; sessionId?: string }>
-  verifyWebhook(headers: Record<string, string>, body: string): Promise<{ valid: boolean; payload?: any }>
-  handleWebhookEvent(payload: any): Promise<void>
+  verifyWebhook(headers: Record<string, string>, body: string): Promise<{ valid: boolean; payload?: Stripe.Event | any }>
+  handleWebhookEvent(event: Stripe.Event | unknown): Promise<void>
 }
 
 // Default export is not provided — concrete providers implement this interface.

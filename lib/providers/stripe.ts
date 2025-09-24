@@ -1,8 +1,106 @@
 import Stripe from 'stripe'
+
+// Narrowed type for the parts of Checkout Session we rely on in webhook handling.
+
+type ExpandedLineItemPrice = {
+  id?: string
+  object?: string
+  unit_amount?: number | null
+  product?: string | Stripe.Product | null
+  metadata?: Record<string, string> | undefined
+  // price may contain product metadata and recurring info in other contexts
+  recurring?: { interval?: string; interval_count?: number } | null
+}
+
+type ExpandedLineItem = {
+  id?: string
+  object?: string
+  quantity?: number
+  price?: ExpandedLineItemPrice | null
+  description?: string | null
+  amount_subtotal?: number | null
+  amount_total?: number | null
+  price_data?: {
+    currency?: string | null
+    product_data?: { name?: string | null; metadata?: Record<string, string> | undefined } | null
+    unit_amount?: number | null
+  } | null
+}
+
+type ExpandedLineItems = {
+  object?: string
+  data: ExpandedLineItem[]
+  has_more?: boolean
+}
+
+export type ExpandedCheckoutSession = {
+  id?: string
+  object?: string
+  amount_total?: number | null
+  amount_subtotal?: number | null
+  currency?: string | null
+  // payment_intent may be an id string or an expanded object
+  payment_intent?: string | (Stripe.PaymentIntent & { charges?: { data?: Array<any> } }) | null
+  customer?: string | Stripe.Customer | null
+  customer_details?: {
+    email?: string | null
+    name?: string | null
+    phone?: string | null
+    address?: {
+      postal_code?: string | null
+      state?: string | null
+      city?: string | null
+      line1?: string | null
+      line2?: string | null
+      country?: string | null
+    } | null
+  } | null
+  shipping_details?: {
+    address?: {
+      postal_code?: string | null
+      state?: string | null
+      city?: string | null
+      line1?: string | null
+      line2?: string | null
+      country?: string | null
+    } | null
+    name?: string | null
+    phone?: string | null
+  } | null
+  // shipping_cost may be present on some sessions
+  shipping_cost?: { amount_total?: number | null } | null
+  // charges may be present on expanded PaymentIntent or session
+  charges?: {
+    object?: string
+    data?: Array<{
+      id?: string
+      object?: string
+      amount?: number
+      status?: string
+      metadata?: Record<string,string>
+    }>
+  } | null
+  metadata?: (Record<string, string> & {
+    orderId?: string
+    expectedTotal?: string
+    userEmail?: string
+    shippingAddress?: string
+    postalCode?: string
+    phoneNumber?: string
+    deliveryService?: string
+    weightGrams?: string
+    userId?: string
+  }) | undefined
+  line_items?: ExpandedLineItems | null
+  amount_details?: any
+  // allow passthrough for other fields we don't strictly type here
+  [k: string]: any
+}
 import { Provider, OrderInput } from './provider'
 import { prisma } from '../prisma'
 import { runWithRetry } from '@/lib/dbWithRetry'
 import config from '../config'
+import os from 'os'
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY || ''
 let stripe: Stripe | null = null
@@ -11,6 +109,11 @@ try {
 } catch (initErr) {
   console.error('[stripe] initialization error:', initErr)
   // keep stripe as null; functions below will check and throw meaningful errors
+}
+
+// Test helper to inject a mock Stripe client in unit tests
+export function setStripeClient(client: any) {
+  stripe = client
 }
 
 const STRIPE_DEBUG = (process.env.STRIPE_DEBUG === 'true')
@@ -23,6 +126,8 @@ function stripeDebug(...args: unknown[]) {
 async function withRetries<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
   return runWithRetry(fn, { retries: attempts })
 }
+
+// Use exported `ExpandedCheckoutSession` declared above for typed session access.
 
 // Helpers for safe metadata and value parsing
 function toStringMetadata(metadata?: Record<string, any>): Record<string, string> | undefined {
@@ -136,24 +241,228 @@ function getAddressFromUnknown(a: unknown): { line1?: string; line2?: string; po
   return Object.keys(out).length > 0 ? out : undefined
 }
 
+// Exported helper for unit tests: resolve total amount using session metadata precedence.
+export function resolveTotalFromSession(session: ExpandedCheckoutSession | null | undefined): number {
+  if (!session) return 0
+  const metaExpectedTotal = session.metadata && session.metadata.expectedTotal ? parseInt(String(session.metadata.expectedTotal)) : undefined
+  return metaExpectedTotal || (typeof session.amount_total === 'number' ? session.amount_total : 0)
+}
+
+// Helper: fetch expanded session from Stripe; fall back to payload.data.object when appropriate
+async function fetchExpandedSession(sessionId: string, payload: Stripe.Event | any): Promise<{ session: ExpandedCheckoutSession | null, sessionId: string | undefined, recoveredFromPayload: boolean }> {
+  if (!sessionId) return { session: null as ExpandedCheckoutSession | null, sessionId: undefined, recoveredFromPayload: false }
+
+  const disablePayloadFallbackInProd = String(process.env.DISABLE_STRIPE_PAYLOAD_FALLBACK_IN_PRODUCTION || '').toLowerCase() === 'true'
+  let session: ExpandedCheckoutSession | null = null
+  let recoveredFromPayload = false
+
+  const payloadAny = payload as any
+  try {
+    if (!stripe) throw new Error('Stripe client not initialized: missing STRIPE_SECRET_KEY or initialization failed')
+    session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ['payment_intent', 'line_items', 'customer'] }) as ExpandedCheckoutSession
+    try {
+      const fs = await import('fs')
+      const path = await import('path')
+      const dbgDir = os.tmpdir()
+      try { fs.mkdirSync(dbgDir, { recursive: true }) } catch (e) { /* ignore */ }
+      const dbgPath = path.join(dbgDir, 'stripe-full-debug.log')
+      const dump = { ts: new Date().toISOString(), action: 'session_full_dump', eventId: payloadAny?.id, sessionId, sessionMetadata: session.metadata || null, sessionShippingDetails: session.shipping_details || null, sessionCustomerDetails: session.customer_details || null, payment_intent: session.payment_intent || null, session: session || null }
+      fs.appendFileSync(dbgPath, JSON.stringify(dump) + '\n')
+    } catch (e) { /* ignore logging */ }
+    try {
+      const fs = await import('fs')
+      const path = await import('path')
+      const dbgPath = path.join(os.tmpdir(), 'stripe-handler-debug.log')
+      const liLen = (session && session.line_items && (session.line_items as any).data && Array.isArray((session.line_items as any).data)) ? (session.line_items as any).data.length : 0
+      const entry = JSON.stringify({ ts: new Date().toISOString(), action: 'session_retrieved', sessionId, lineItemsLength: liLen, hasMetadata: !!session.metadata }) + '\n'
+      fs.appendFileSync(dbgPath, entry)
+    } catch (e) { /* ignore logging */ }
+  } catch (retrieveErr: any) {
+    const isResourceMissing = retrieveErr && (retrieveErr.code === 'resource_missing' || retrieveErr?.raw?.code === 'resource_missing' || retrieveErr?.statusCode === 404)
+    if (isResourceMissing) {
+      console.warn('[stripe] checkout.session not found on Stripe for id (fixture or deleted):', sessionId)
+      console.warn('[stripe] retrieve error details:', { code: retrieveErr?.code, message: retrieveErr?.message, statusCode: retrieveErr?.statusCode, type: retrieveErr?.type })
+      if (disablePayloadFallbackInProd && process.env.NODE_ENV === 'production') {
+        console.warn('[stripe] payload fallback disabled in production by DISABLE_STRIPE_PAYLOAD_FALLBACK_IN_PRODUCTION; marking event processed and skipping')
+        try {
+          await prisma.stripeEvent.upsert({ where: { id: payloadAny.id }, create: { id: payloadAny.id, type: payloadAny.type, payload: payloadAny, processed: true, processedAt: new Date() }, update: { processed: true, processedAt: new Date() } })
+        } catch (e) {
+          console.warn('[stripe] marking event processed failed (prod fallback disabled):', e)
+        }
+        return { session: null as ExpandedCheckoutSession | null, sessionId, recoveredFromPayload: false }
+      }
+          try {
+            const rawSession = payloadAny?.data?.object
+            if (rawSession) {
+              session = rawSession as ExpandedCheckoutSession
+              recoveredFromPayload = true
+              try {
+                const fs = await import('fs')
+                const path = await import('path')
+                const dbgDir = os.tmpdir()
+                try { fs.mkdirSync(dbgDir, { recursive: true }) } catch (e) { /* ignore */ }
+                const dbgPath = path.join(dbgDir, 'stripe-full-debug.log')
+                const dump = { ts: new Date().toISOString(), action: 'session_full_dump_fallback_payload', eventId: payloadAny?.id, sessionId, sessionMetadata: session.metadata || null, sessionShippingDetails: session.shipping_details || null, sessionCustomerDetails: session.customer_details || null, payment_intent: session.payment_intent || null, session: session || null }
+                fs.appendFileSync(dbgPath, JSON.stringify(dump) + '\n')
+              } catch (e) { /* ignore logging errors */ }
+              try {
+                const fs = await import('fs')
+                const path = await import('path')
+                const dbgPath = path.join(os.tmpdir(), 'stripe-handler-debug.log')
+                const liLen = session && session.line_items && (session.line_items as any).data && Array.isArray((session.line_items as any).data) ? (session.line_items as any).data.length : 0
+                const entry = JSON.stringify({ ts: new Date().toISOString(), action: 'session_retrieved_via_payload_fallback', sessionId, lineItemsLength: liLen, hasMetadata: !!session.metadata }) + '\n'
+                fs.appendFileSync(dbgPath, entry)
+              } catch (e) { /* ignore logging */ }
+            } else {
+          try { await prisma.stripeEvent.upsert({ where: { id: payloadAny.id }, create: { id: payloadAny.id, type: payloadAny.type, payload: payloadAny, processed: true, processedAt: new Date() }, update: { processed: true, processedAt: new Date() } }) } catch (e) { console.warn('[stripe] marking event processed failed:', e) }
+          return { session: null as ExpandedCheckoutSession | null, sessionId, recoveredFromPayload: false }
+        }
+      } catch (e) {
+        console.error('[stripe] fallback payload processing failed for session:', sessionId, e)
+        throw retrieveErr
+      }
+    }
+    if (!recoveredFromPayload) {
+      console.error('[stripe] failed to retrieve checkout session:', sessionId, { error: retrieveErr?.message, code: retrieveErr?.code, statusCode: retrieveErr?.statusCode })
+      throw retrieveErr
+    }
+  }
+
+  if (!session) {
+    console.error('[stripe] session is null after retrieval/fallback for id:', sessionId)
+    throw new Error('session missing after retrieval and fallback')
+  }
+  return { session: session as ExpandedCheckoutSession, sessionId, recoveredFromPayload }
+}
+
+// Export helper for unit testing
+export { fetchExpandedSession }
+
+// Helper: resolve order via paymentIntent -> payment -> order update (idempotency)
+async function resolveOrCreateOrder(session: ExpandedCheckoutSession | null, payload: Stripe.Event | any, matchedUserId: string | undefined, shippingAddress: string, paymentIntentId: string | undefined, sessionId?: string): Promise<{ order: { id: string } | null }> {
+  let order: { id: string } | null = null
+  const payloadAny = payload as any
+  // Ensure we have a working session object for typed access within this helper.
+  // If null, use an empty cast object to avoid many null checks; callers should pass session when available.
+  const s: ExpandedCheckoutSession = (session || ({} as ExpandedCheckoutSession)) as ExpandedCheckoutSession
+  if (paymentIntentId) {
+    try {
+      const existingPayment = await prisma.payment.findFirst({ where: { stripeId: paymentIntentId } })
+      if (existingPayment && existingPayment.orderId) {
+        try {
+          const found = await prisma.order.findUnique({ where: { id: existingPayment.orderId } })
+          if (found) {
+            const finalCustomerEmail = getStringFromRecord((s && s.customer_details) ? (s.customer_details as unknown as Record<string, unknown>) : undefined, 'email') || extractCustomerEmail(s.customer) || found.customerEmail
+            const cdName = getStringFromRecord((s && s.customer_details) ? (s.customer_details as unknown as Record<string, unknown>) : undefined, 'name')
+            const sessionName = (s.customer && typeof s.customer === 'object' && typeof (s.customer as Stripe.Customer).name === 'string') ? (s.customer as Stripe.Customer).name : undefined
+            const dbName = found.customerName ?? ''
+            const finalCustomerName: string = cdName ?? sessionName ?? dbName
+            const cdPhone = getStringFromRecord((s && s.customer_details) ? (s.customer_details as unknown as Record<string, unknown>) : undefined, 'phone')
+            const sessionPhone = (s.customer && typeof s.customer === 'object' && typeof (s.customer as Stripe.Customer).phone === 'string') ? (s.customer as Stripe.Customer).phone : undefined
+            const dbPhone = found.customerPhone ?? ''
+            const finalCustomerPhone: string = cdPhone ?? sessionPhone ?? dbPhone
+            const metaExpectedTotal = s.metadata && s.metadata.expectedTotal ? parseInt(String(s.metadata.expectedTotal)) : undefined
+            const resolvedTotalForUpdate = metaExpectedTotal || s.amount_total || found.totalAmount
+            if (metaExpectedTotal && metaExpectedTotal !== (s.amount_total || 0)) {
+              console.warn('[stripe] metadata.expectedTotal differs from session.amount_total; using metadata as source-of-truth for order total', { sessionId, metaExpectedTotal, sessionAmount: s.amount_total })
+            }
+            order = await withRetries(() => prisma.order.update({ where: { id: found.id }, data: { status: 'paid', totalAmount: resolvedTotalForUpdate, subtotal: resolvedTotalForUpdate - (s.shipping_cost?.amount_total || 0), shippingFee: s.shipping_cost?.amount_total || 0, customerEmail: finalCustomerEmail, customerName: finalCustomerName, customerPhone: finalCustomerPhone, shippingAddress: shippingAddress || found.shippingAddress, notes: `Stripe Session ID: ${sessionId}`, userId: matchedUserId ? matchedUserId : undefined } }))
+            console.log('[stripe] reused existing order found via payment.stripeId:', found.id)
+          }
+        } catch (e) {
+          console.warn('[stripe] error reusing order via existing payment:', e)
+        }
+      }
+    } catch (e) {
+      console.warn('[stripe] could not query existing payment for idempotency:', e)
+    }
+  }
+  // If we didn't resolve an order via paymentIntent, attempt to resolve via metadata.orderId
+  try {
+  const existingOrderId = (s && s.metadata && s.metadata.orderId) ? String(s.metadata.orderId) : (payloadAny?.data?.object && payloadAny.data.object.metadata && payloadAny.data.object.metadata.orderId ? String(payloadAny.data.object.metadata.orderId) : undefined)
+    if (!order && existingOrderId) {
+      try {
+        const found = await prisma.order.findUnique({ where: { id: existingOrderId } })
+        if (found) {
+          order = await withRetries(() => prisma.order.update({ where: { id: found.id }, data: { status: 'paid', shippingAddress: shippingAddress || found.shippingAddress, userId: matchedUserId ? matchedUserId : undefined, notes: sessionId ? `Stripe Session ID: ${sessionId}` : found.notes } }))
+          console.log('[stripe] reused existing order via metadata.orderId:', found.id)
+        }
+      } catch (e) {
+        console.warn('[stripe] error reusing order via metadata.orderId:', e)
+      }
+    }
+      } catch (e) {
+        // ignore
+      }
+
+  // Final fallback: if still no order and session contains amount_total, create a new order
+  if (!order) {
+  try {
+  const finalCustomerEmail = getStringFromRecord((s && s.customer_details) ? s.customer_details : undefined, 'email') || (s && s.customer && typeof s.customer === 'string' ? undefined : extractCustomerEmail(s.customer)) || ''
+  const cdName = getStringFromRecord((s && s.customer_details) ? s.customer_details : undefined, 'name')
+  const sessionName = (s && s.customer && typeof s.customer === 'object' && typeof (s.customer as any).name === 'string') ? (s.customer as any).name : undefined
+  const finalCustomerName: string = cdName ?? sessionName ?? ''
+  const cdPhone = getStringFromRecord((s && s.customer_details) ? s.customer_details : undefined, 'phone')
+  const sessionPhone = (s && s.customer && typeof s.customer === 'object' && typeof (s.customer as any).phone === 'string') ? (s.customer as any).phone : undefined
+  const finalCustomerPhone: string = cdPhone ?? sessionPhone ?? ''
+
+  const metaExpectedTotalNew = s && s.metadata && s.metadata.expectedTotal ? parseInt(String(s.metadata.expectedTotal)) : undefined
+  const resolvedTotalForCreate = metaExpectedTotalNew || s.amount_total || 0
+      order = await withRetries(() => prisma.order.create({
+        data: {
+          totalAmount: resolvedTotalForCreate,
+          currency: s.currency || 'jpy',
+          status: 'paid',
+          customerEmail: finalCustomerEmail,
+          customerName: finalCustomerName,
+          customerPhone: finalCustomerPhone,
+          shippingAddress: shippingAddress || (s && s.metadata && s.metadata.shippingAddress) || '',
+          subtotal: (s && s.amount_total || 0) - (s && s.shipping_cost ? s.shipping_cost.amount_total || 0 : 0),
+          shippingFee: s && s.shipping_cost ? s.shipping_cost.amount_total || 0 : 0,
+          notes: sessionId ? `Stripe Session ID: ${sessionId}` : 'created_by_resolveOrCreateOrder',
+          userId: matchedUserId ? matchedUserId : undefined
+        }
+      }))
+      console.log('[stripe] created fallback order in resolveOrCreateOrder:', order.id)
+    } catch (e) {
+      console.warn('[stripe] fallback order creation failed in resolveOrCreateOrder:', e)
+    }
+  }
+
+  return { order }
+}
+
+// Export helper for unit testing
+export { resolveOrCreateOrder }
+
 export const stripeProvider: Provider = {
   async createCheckoutSession(order: OrderInput) {
-    const line_items = (order.items || []).map((it) => ({
-      price_data: {
-        currency: order.currency || 'jpy',
-        product_data: { name: it.name || it.sku },
-        // JPYの場合、最小単位は1円（他の通貨と異なり100で割らない）
-        unit_amount: Math.round(it.unitPrice),
-      },
-      quantity: it.quantity,
-    }))
+    const line_items = (order.items || []).map((rawIt) => {
+      const it: any = rawIt
+      // Ensure we attach internal productId to price_data.product_data.metadata when available
+      const productMetadata: Record<string,string> = {}
+      if (it.internalProductId) {
+        productMetadata.productId = String(it.internalProductId)
+      } else if (it.sku) {
+        productMetadata.productId = String(it.sku)
+      }
+      return {
+        price_data: {
+          currency: order.currency || 'jpy',
+          product_data: { name: it.name || it.sku, metadata: Object.keys(productMetadata).length>0 ? productMetadata : undefined },
+          // JPYの場合、最小単位は1円（他の通貨と異なり100で割らない）
+          unit_amount: Math.round(it.unitPrice),
+        },
+        quantity: it.quantity,
+      }
+    })
 
     // 送料がある場合、line_itemsに追加
     if (order.shippingFee && order.shippingFee > 0) {
       line_items.push({
         price_data: {
           currency: order.currency || 'jpy',
-          product_data: { name: '送料' },
+          product_data: { name: '送料', metadata: undefined },
           unit_amount: Math.round(order.shippingFee),
         },
         quantity: 1,
@@ -164,12 +473,26 @@ export const stripeProvider: Provider = {
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || config.NEXTAUTH_URL || config.getBaseUrl()).replace(/\/$/, '')
     console.log('[stripe] using appUrl for success/cancel urls:', appUrl)
 
+    // Ensure userEmail is included in metadata for webhook processing
+    const baseMetadata = toStringMetadata(order.metadata) || {}
+    const metadata: Record<string,string> = { ...baseMetadata }
+    if (order.metadata?.userEmail) {
+      metadata.userEmail = order.metadata.userEmail
+    }
+    if (order.metadata?.userId) {
+      metadata.userId = order.metadata.userId
+    }
+    // Include shipping info from pre-checkout form into metadata as a fallback
+    if (order.customerInfo?.address) metadata.shippingAddress = String(order.customerInfo.address)
+    if (order.customerInfo?.postalCode) metadata.postalCode = String(order.customerInfo.postalCode)
+    if (order.customerInfo?.phone) metadata.phoneNumber = String(order.customerInfo.phone)
+
     // customer/customer_emailは初期化時に含めない
     const sessionOptions: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ['card'],
       mode: 'payment',
       line_items,
-  metadata: toStringMetadata(order.metadata),
+      metadata,
       success_url: `${appUrl}/shop/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/shop/checkout/cancel`,
       billing_address_collection: 'required',
@@ -179,6 +502,50 @@ export const stripeProvider: Provider = {
       phone_number_collection: {
         enabled: true,
       },
+    }
+
+    // --- 新規改善: Stripe セッション作成前に DB 上で Order + OrderItems を先に作成し、
+    // セッションの metadata.orderId にセットすることで、Webhook 側で items が抜ける問題を防ぐ。
+    // 既存フローでは webhook が注文を新規作成するが、その際 line_items から商品IDを信頼できないため
+    // 事前に orderId を作成して渡す方式に変更する。
+    let dbOrder: any | null = null
+    try {
+      const subtotalCalc = (order.items || []).reduce((s, it) => s + Math.round((it.unitPrice || 0) * (it.quantity || 0)), 0)
+      const shippingFeeCalc = order.shippingFee ? Math.round(order.shippingFee) : 0
+      const totalCalc = subtotalCalc + shippingFeeCalc
+
+      const createData: any = {
+        totalAmount: totalCalc,
+        currency: order.currency || 'jpy',
+        status: 'pending',
+        customerEmail: order.customerInfo?.email || (order.metadata && order.metadata.userEmail) || '',
+        customerName: order.customerInfo?.name || (order.metadata && order.metadata.userName) || '',
+        customerPhone: order.customerInfo?.phone || '',
+        shippingAddress: order.customerInfo?.address || (order.metadata && order.metadata.shippingAddress) || '',
+        subtotal: subtotalCalc,
+        shippingFee: shippingFeeCalc,
+        notes: 'Created before checkout session',
+        userId: order.metadata?.userId || undefined,
+        orderItems: {
+          create: (order.items || []).map((it) => ({
+            productId: String(it.sku || ''),
+            quantity: it.quantity || 1,
+            unitPrice: Math.round(it.unitPrice || 0),
+            totalPrice: Math.round((it.unitPrice || 0) * (it.quantity || 1))
+          }))
+        }
+      }
+
+      dbOrder = await withRetries(() => prisma.order.create({ data: createData }))
+      // ensure metadata object exists and include orderId for webhook linkage
+      metadata.orderId = dbOrder.id
+      console.log('[stripe] pre-created DB order before checkout session:', dbOrder.id)
+      // debug: show shippingAddress and metadata keys passed into session
+      try {
+        console.log('[stripe][createCheckoutSession] pre-order shippingAddress:', createData.shippingAddress, 'metadataKeys:', Object.keys(metadata))
+      } catch (e) { /* ignore logging errors */ }
+    } catch (orderCreateErr) {
+      console.warn('[stripe] could not pre-create DB order for checkout session, continuing without pre-order:', orderCreateErr)
     }
 
     // 既存顧客の検索または新規作成
@@ -286,12 +653,42 @@ export const stripeProvider: Provider = {
       customer_email: (sessionOptions as any).customer_email,
       metadata: sessionOptions.metadata
     })
+    try {
+      // Log line_items detail to help diagnose price/product creation errors
+      console.log('[stripe] creating checkout session - line_items sample:', Array.isArray(line_items) ? line_items.slice(0, 50) : line_items)
+      // Also include a compact JSON dump of sessionOptions (avoid sensitive full dump)
+      try {
+        const safeDump = {
+          ...sessionOptions,
+          line_items: Array.isArray(line_items) ? line_items.map(li => ({ quantity: li.quantity, price_data: li.price_data ? { currency: li.price_data.currency, unit_amount: (li.price_data as any).unit_amount, product_data: li.price_data.product_data ? { name: (li.price_data.product_data as any).name, metadata: (li.price_data.product_data as any).metadata } : undefined } : undefined })) : sessionOptions.line_items
+        }
+        console.log('[stripe] sessionOptions compact dump:', JSON.stringify(safeDump))
+      } catch (e) {
+        console.warn('[stripe] failed to stringify sessionOptions for debug:', e)
+      }
+    } catch (e) {
+      /* ignore logging errors */
+    }
     const session = await stripe.checkout.sessions.create(sessionOptions)
+
+    try {
+      console.log('[stripe] created checkout session:', { sessionId: session.id, orderId: metadata.orderId })
+      // If we pre-created a DB order, persist the sessionId into its notes for easier lookup
+      if (dbOrder && dbOrder.id) {
+        try {
+          await prisma.order.update({ where: { id: dbOrder.id }, data: { notes: `Created before checkout session; Stripe Session ID: ${session.id}` } })
+        } catch (e) {
+          console.warn('[stripe] could not persist sessionId to order notes:', e)
+        }
+      }
+    } catch (e) {
+      /* ignore logging persistence errors */
+    }
 
     return { checkoutUrl: session.url || undefined, sessionId: session.id }
   },
 
-  async verifyWebhook(headers: Record<string, string>, body: string) {
+  async verifyWebhook(headers: Record<string, string>, body: string): Promise<{ valid: boolean; payload?: Stripe.Event | any }> {
     const sig = headers['stripe-signature'] || headers['Stripe-Signature'] || ''
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
     if (!webhookSecret) {
@@ -313,15 +710,27 @@ export const stripeProvider: Provider = {
     }
   },
 
-  async handleWebhookEvent(payload: any) {
-    console.log('stripe webhook event received:', payload?.type || '(no type)', {
-      eventId: payload?.id,
+  async handleWebhookEvent(event: Stripe.Event | unknown) {
+    // Type guard for Stripe.Event
+    function isStripeEvent(obj: unknown): obj is Stripe.Event {
+      return !!obj && typeof obj === 'object' && 'id' in (obj as any) && 'type' in (obj as any)
+    }
+
+    const eventLocal: Stripe.Event | any = isStripeEvent(event) ? (event as Stripe.Event) : (event as any)
+
+    console.log('stripe webhook event received:', eventLocal?.type || '(no type)', {
+      eventId: eventLocal?.id,
       timestamp: new Date().toISOString(),
       databaseUrl: process.env.DATABASE_URL ? 'configured' : 'missing'
     })
-    stripeDebug('raw payload keys:', payload && typeof payload === 'object' ? Object.keys(payload).slice(0,10) : String(payload))
+    stripeDebug('raw payload keys:', eventLocal && typeof eventLocal === 'object' ? Object.keys(eventLocal).slice(0,10) : String(eventLocal))
 
-    if (!payload?.id || !payload?.type) {
+    // normalize payload for local typed access (declare early so catch blocks can reference)
+    const payloadAny = event as any
+    // provide legacy `payload` variable used throughout the handler
+    const payload: any = eventLocal as any
+
+    if (!eventLocal?.id || !eventLocal?.type) {
       console.warn('[stripe] invalid webhook payload: missing id or type')
       return
     }
@@ -341,13 +750,14 @@ export const stripeProvider: Provider = {
         throw new Error(`Database connection failed: ${dbTestErr?.message}`)
       }
 
-      // 1) 最初に upsert でイベントを登録または保持する（冪等性確保）
+
+    // 1) 最初に upsert でイベントを登録または保持する（冪等性確保）
       // upsert は競合回避に有用で、同一イベントの複数同時配信でも安全に動作します。
       try {
         await prisma.stripeEvent.upsert({
-          where: { id: payload.id },
-          create: { id: payload.id, type: payload.type, payload: payload, processed: false },
-          update: { payload: payload }
+          where: { id: eventLocal.id },
+          create: { id: eventLocal.id, type: eventLocal.type, payload: eventLocal, processed: false },
+          update: { payload: eventLocal }
         })
       } catch (upsertErr: any) {
         // upsert が P2002 (unique constraint) を投げることは通常ないが、
@@ -362,101 +772,54 @@ export const stripeProvider: Provider = {
       }
 
       // 再チェック：もし既に processed=true なら二重処理を避ける
-      const existing = await prisma.stripeEvent.findUnique({ where: { id: payload.id } })
+      const existing = await prisma.stripeEvent.findUnique({ where: { id: eventLocal.id } })
       if (existing && existing.processed) {
-        console.log('[stripe] event already processed (skip):', payload.id)
+        console.log('[stripe] event already processed (skip):', eventLocal.id)
         return
       }
 
-      // 2) checkout.session.completed の場合は注文とペイメントを作成
-      if (payload.type === 'checkout.session.completed') {
-          const sessionId = payload?.data?.object?.id
-          stripeDebug('checkout.session.completed payload.data.object keys:', payload?.data?.object && typeof payload.data.object === 'object' ? Object.keys(payload.data.object).slice(0,20) : String(payload?.data?.object))
-            if (sessionId) {
-            // Stripe から詳細セッション情報を取得
-            if (!stripe) {
-              throw new Error('Stripe client not initialized: missing STRIPE_SECRET_KEY or initialization failed')
-            }
-            // We request expanded fields; define a local union type to help TypeScript understand shipping_details/payment_intent
-            type ExpandedCheckoutSession = Stripe.Checkout.Session & {
-              payment_intent?: Stripe.PaymentIntent | string | null
-              line_items?: Stripe.ApiList<Stripe.LineItem>
-              customer?: Stripe.Customer | string | null
-              shipping_details?: {
-                name?: string | null
-                phone?: string | null
-                address?: {
-                  line1?: string | null
-                  line2?: string | null
-                  postal_code?: string | null
-                  city?: string | null
-                  state?: string | null
-                  country?: string | null
-                } | null
-              } | null
+    // 2) checkout.session.completed の場合は注文とペイメントを作成
+    if (payload.type === 'checkout.session.completed') {
+      const payloadObj: any = (payload as any)?.data?.object
+      const sessionFetch = async () => {
+        const sessionId = payloadObj?.id
+        stripeDebug('checkout.session.completed payload.data.object keys:', payloadObj && typeof payloadObj === 'object' ? Object.keys(payloadObj).slice(0,20) : String(payloadObj))
+        if (!sessionId) return { session: null as ExpandedCheckoutSession | null, sessionId: undefined, recoveredFromPayload: false }
+
+        // Extracted to a helper below
+        return await fetchExpandedSession(sessionId, payloadAny)
+      }
+
+          const { session: fetchedSession, sessionId } = await sessionFetch()
+            if (!sessionId) {
+              // nothing to do
+            } else {
+            // attach session variable into local scope
+            // reuse existing variable names used below by assigning
+            const _session = fetchedSession as ExpandedCheckoutSession | null
+            const sessionLocal: ExpandedCheckoutSession | null = _session
+            // create a local `session` alias for convenience (assert non-null since sessionId existed)
+            const session = sessionLocal as ExpandedCheckoutSession
+            // lightweight alias `s` used across existing code (historical)
+            const s = session
+            // existingOrderId: try metadata on session then payload metadata as fallback
+            let existingOrderId: string | undefined = undefined
+            try {
+              existingOrderId = (s && s.metadata && s.metadata.orderId) ? String(s.metadata.orderId) : (payloadObj && payloadObj.metadata && payloadObj.metadata.orderId ? String(payloadObj.metadata.orderId) : undefined)
+            } catch (e) {
+              existingOrderId = undefined
             }
 
-            let session: ExpandedCheckoutSession | null = null
-            try {
-              session = await stripe.checkout.sessions.retrieve(sessionId, {
-                expand: ['payment_intent', 'line_items', 'customer']
-              }) as ExpandedCheckoutSession
-              console.log('[stripe] successfully retrieved session:', sessionId, {
-                amount_total: session.amount_total,
-                currency: session.currency,
-                payment_status: session.payment_status,
-                status: session.status
-              })
-            } catch (retrieveErr: any) {
-              const isResourceMissing = retrieveErr && (retrieveErr.code === 'resource_missing' || retrieveErr?.raw?.code === 'resource_missing' || retrieveErr?.statusCode === 404)
-              if (isResourceMissing) {
-                console.warn('[stripe] checkout.session not found on Stripe for id (fixture or deleted):', sessionId)
-                console.warn('[stripe] retrieve error details:', {
-                  code: retrieveErr?.code,
-                  message: retrieveErr?.message,
-                  statusCode: retrieveErr?.statusCode,
-                  type: retrieveErr?.type
-                })
-                try {
-                  await prisma.stripeEvent.upsert({
-                    where: { id: payload.id },
-                    create: { id: payload.id, type: payload.type, payload: payload, processed: true, processedAt: new Date() },
-                    update: { processed: true, processedAt: new Date() }
-                  })
-                } catch (e) {
-                  console.warn('[stripe] marking event processed failed:', e)
-                }
-                return
-              }
-              console.error('[stripe] failed to retrieve checkout session:', sessionId, {
-                error: retrieveErr?.message,
-                code: retrieveErr?.code,
-                statusCode: retrieveErr?.statusCode
-              })
-              throw retrieveErr
-            }
-            stripeDebug('expanded session retrieved: id=', session.id, 'customer_details=', session.customer_details ? Object.keys(session.customer_details).slice(0,10) : undefined)
-            stripeDebug('session.shipping_details keys=', session.shipping_details ? Object.keys(session.shipping_details as any) : undefined)
-            stripeDebug('session.payment_intent (type) =', typeof session.payment_intent)
-            // log top-level line items summary
-            try {
-              const items = session.line_items && typeof session.line_items === 'object' && Array.isArray((session.line_items as any).data) ? (session.line_items as any).data.map((it: any) => ({ description: it.description, quantity: it.quantity, price: it.price && it.price.unit_amount })) : undefined
-              stripeDebug('line_items summary:', items)
-            } catch (liErr) {
-              stripeDebug('line_items parse error', liErr)
-            }
-
-            // 顧客情報を取得（優先順位: session.customer_details -> Stripe Customer オブジェクト -> expanded session.customer）
+            // customer details retrieval is unchanged
             let customerDetails: Record<string, unknown> | undefined = undefined
-            if (session.customer_details && typeof session.customer_details === 'object') {
-              customerDetails = session.customer_details as unknown as Record<string, unknown>
+            if (s && s.customer_details && typeof s.customer_details === 'object') {
+              customerDetails = s.customer_details as unknown as Record<string, unknown>
             }
-            // Try to fetch full customer from Stripe if session.customer is present
-            if ((!customerDetails || !customerDetails.name || !customerDetails.phone) && session.customer) {
+            if ((!customerDetails || !customerDetails.name || !customerDetails.phone) && s && s.customer) {
               try {
-                const custId = extractCustomerIdFromSessionCustomer(session.customer)
+                const custId = extractCustomerIdFromSessionCustomer(s.customer)
                 if (custId && stripe) {
-                  const fullCustomer = await stripe.customers.retrieve(custId)
+                  const fullCustomer = await stripe!.customers.retrieve(custId)
                   if (fullCustomer && typeof fullCustomer === 'object') {
                     customerDetails = customerDetails || {}
                     const fc = fullCustomer as unknown as Record<string, unknown>
@@ -472,26 +835,90 @@ export const stripeProvider: Provider = {
             }
 
             // Stripe Customer IDをUserテーブルに保存（email が判明している場合）
-            const custIdForUserRaw = session.customer
+            // また、見つかったユーザーを注文に紐付けるための matchedUserId を保持する
+            let matchedUserId: string | undefined = undefined
+            const custIdForUserRaw = s.customer
             const custIdForUser = extractCustomerIdFromSessionCustomer(custIdForUserRaw)
-            const custEmailForUser = (typeof customerDetails?.email === 'string' ? customerDetails!.email as string : extractCustomerEmail(session.customer))
+            const custEmailForUser = (typeof customerDetails?.email === 'string' ? customerDetails!.email as string : extractCustomerEmail(s.customer))
             stripeDebug('resolved customer for user:', { custIdForUser, custEmailForUser })
+            // Extra tracing to help diagnose why user matching may fail in local tests
+              try {
+              console.log('[stripe][trace] session.customer:', typeof s.customer === 'string' ? s.customer : (s.customer && typeof s.customer === 'object' ? { id: (s.customer as any).id, email: (s.customer as any).email } : s.customer))
+              console.log('[stripe][trace] session.customer_details:', s.customer_details)
+              console.log('[stripe][trace] session.metadata:', s.metadata)
+              console.log('[stripe][trace] payload.data.object.metadata:', payloadObj?.metadata)
+            } catch (traceErr) {
+              console.warn('[stripe][trace] failed to print trace info:', traceErr)
+            }
             if (custIdForUser && custEmailForUser) {
               try {
-                const existingUser = await prisma.user.findUnique({ where: { email: custEmailForUser } })
+                // Use case-insensitive email match and prefer metadata/email sources as fallbacks
+                const resolvedEmail = (custEmailForUser || s.metadata?.userEmail || payloadObj?.metadata?.userEmail) as string
+                console.log('[stripe][trace] attempting prisma.user.findFirst by email (insensitive):', resolvedEmail)
+                const existingUser = await prisma.user.findFirst({ where: { email: { equals: resolvedEmail, mode: 'insensitive' } } })
                 if (existingUser) {
+                  matchedUserId = existingUser.id
                   const updateData: any = { stripeCustomerId: custIdForUser }
                   await withRetries(() => prisma.user.update({
-                    where: { email: custEmailForUser },
+                    where: { id: existingUser.id },
                     data: updateData
                   }))
-                  console.log('[stripe] saved customer ID for user:', custEmailForUser, custIdForUser)
+                  console.log('[stripe] saved customer ID for user:', resolvedEmail, custIdForUser)
+                 // --- Stripe決済完了時にサーバ側でカートを削除 ---
+                 try {
+                   console.log('[stripe][trace] about to delete cartItems for userId:', existingUser.id)
+                   const deleted = await prisma.cartItem.deleteMany({ where: { userId: existingUser.id } })
+                   console.log('[stripe] サーバ側でカートを削除:', { userId: existingUser.id, email: existingUser.email, deletedCount: deleted.count })
+                 } catch (cartDelErr) {
+                   console.error('[stripe] サーバ側カート削除失敗:', cartDelErr)
+                 }
                 } else {
-                  console.log('[stripe] user not found, skipping user update for email:', custEmailForUser)
+                  console.log('[stripe] user not found by email, skipping user update for email:', custEmailForUser)
+                  // Dump current users count for visibility (non-sensitive):
+                  try {
+                    const c = await prisma.user.count({ where: { email: custEmailForUser } })
+                    console.log('[stripe][trace] prisma.user.count for email result:', c)
+                  } catch (countErr) {
+                    console.warn('[stripe][trace] could not count users for email:', countErr)
+                  }
                 }
               } catch (userUpdateError) {
                 console.warn('[stripe] could not update user with customer ID:', userUpdateError)
                 // エラーでも決済処理は続行する
+              }
+            } else if (custIdForUser) {
+              // stripeCustomerId で user を特定できる場合もカート削除を試みる
+              try {
+                console.log('[stripe][trace] attempting prisma.user.findUnique by stripeCustomerId:', custIdForUser)
+                const userByStripeId = await prisma.user.findUnique({ where: { stripeCustomerId: custIdForUser } })
+                if (userByStripeId) {
+                  matchedUserId = userByStripeId.id
+                  console.log('[stripe][trace] found user by stripeCustomerId:', { id: userByStripeId.id, email: userByStripeId.email })
+                  const deleted = await prisma.cartItem.deleteMany({ where: { userId: userByStripeId.id } })
+                  console.log('[stripe] サーバ側でカートを削除 (stripeCustomerId):', { userId: userByStripeId.id, email: userByStripeId.email, deletedCount: deleted.count })
+                } else {
+                  console.log('[stripe][trace] no user found by stripeCustomerId:', custIdForUser)
+                }
+              } catch (cartDelErr) {
+                console.error('[stripe] サーバ側カート削除失敗 (stripeCustomerId):', cartDelErr)
+              }
+            } else if (custEmailForUser) {
+              // email だけで user を特定できる場合
+              try {
+                // Use case-insensitive lookup for fallback email as well
+                const resolvedFallbackEmail = (custEmailForUser || s.metadata?.userEmail || payloadObj?.metadata?.userEmail) as string
+                console.log('[stripe][trace] attempting prisma.user.findFirst by email (fallback, insensitive):', resolvedFallbackEmail)
+                const userByEmail = await prisma.user.findFirst({ where: { email: { equals: resolvedFallbackEmail, mode: 'insensitive' } } })
+                if (userByEmail) {
+                  matchedUserId = userByEmail.id
+                  console.log('[stripe][trace] found user by email (fallback):', { id: userByEmail.id })
+                  const deleted = await prisma.cartItem.deleteMany({ where: { userId: userByEmail.id } })
+                  console.log('[stripe] サーバ側でカートを削除 (email):', { userId: userByEmail.id, email: userByEmail.email, deletedCount: deleted.count })
+                } else {
+                  console.log('[stripe][trace] no user found by email (fallback):', custEmailForUser)
+                }
+              } catch (cartDelErr) {
+                console.error('[stripe] サーバ側カート削除失敗 (email):', cartDelErr)
               }
             }
 
@@ -509,12 +936,25 @@ export const stripeProvider: Provider = {
               ].filter(Boolean).join(' ')
             }
 
+            // フロントから渡された metadata に配送先情報がある場合はフォールバックとして使う
+            const metadataFromSession = s.metadata || (payloadObj && payloadObj.metadata) || {}
+            const metaShippingAddr = typeof metadataFromSession.shippingAddress === 'string' ? metadataFromSession.shippingAddress : undefined
+            if (!shippingAddress && metaShippingAddr) {
+              shippingAddress = String(metaShippingAddr).trim()
+            }
+
             // Stripe顧客情報をCheckout画面の配送先で上書き
             // shipping_details may be present on the expanded session
-            const sessionShippingDetails = (session as ExpandedCheckoutSession).shipping_details
-            if (session.customer && sessionShippingDetails && sessionShippingDetails.address) {
+            const sessionShippingDetails = (s as any).shipping_details
+            if ((!shippingAddress || shippingAddress.length === 0) && sessionShippingDetails && sessionShippingDetails.address) {
+              // Build shippingAddress from session.shipping_details if not already set
+              const sAddr = sessionShippingDetails.address
+              const built = [sAddr.postal_code, sAddr.state, sAddr.city, sAddr.line1, sAddr.line2].filter(Boolean).join(' ')
+              if (built) shippingAddress = built
+            }
+            if (s.customer && sessionShippingDetails && sessionShippingDetails.address) {
               try {
-                const custId = extractCustomerIdFromSessionCustomer(session.customer)
+                const custId = extractCustomerIdFromSessionCustomer(s.customer)
                 if (custId) {
                   const shippingAddr = sessionShippingDetails.address
                   const updatePayload: Stripe.CustomerUpdateParams = {
@@ -529,7 +969,7 @@ export const stripeProvider: Provider = {
                   }
                   if (sessionShippingDetails.name) updatePayload.name = sessionShippingDetails.name
                   if (sessionShippingDetails.phone) updatePayload.phone = sessionShippingDetails.phone
-                  await stripe.customers.update(custId, updatePayload)
+                  if (stripe) await stripe.customers.update(custId, updatePayload)
                   console.log('[stripe] 顧客情報をCheckout配送先で上書き:', custId, updatePayload)
                 }
               } catch (err) {
@@ -538,47 +978,106 @@ export const stripeProvider: Provider = {
             }
 
             // 注文を作成または既存注文の更新（metadata.orderId があれば更新）
-            const shippingCost = session.shipping_cost?.amount_total || 0
+            const shippingCost = s ? s.shipping_cost?.amount_total || 0 : 0
 
             // payment_intent は expand しているためオブジェクト／文字列どちらの可能性もある
-            const paymentIntentRaw: unknown = session.payment_intent
+            const paymentIntentRaw: unknown = s.payment_intent
             const paymentIntentId = getIdFromUnknown(paymentIntentRaw)
             stripeDebug('[stripe] payment_intent raw type:', typeof paymentIntentRaw, 'resolved id:', paymentIntentId)
 
             // 既存注文IDがセッションのmetadataにあれば、その注文を paid に更新して使う
-            let order: { id: string } | null = null
-            const existingOrderId = session.metadata?.orderId || payload?.data?.object?.metadata?.orderId
-            if (existingOrderId) {
+            // 追加: まず paymentIntentId（または chargeId）から既存の Payment を探し、それに紐づく Order を優先して利用する
+            // これは同一支払いが複数回 webhook を送る/処理されるケースでの重複 Order 作成を防ぐための冪等性強化です。
+            // Resolve or create order using helper
+            let { order } = await resolveOrCreateOrder(s, payload, matchedUserId, shippingAddress, paymentIntentId, sessionId)
+
+            // Search for any order already referencing this sessionId in notes
+            try {
+              const ordersWithSession = await prisma.order.findMany({ where: { notes: { contains: sessionId } }, take: 1 })
+              if (ordersWithSession && ordersWithSession.length > 0) {
+                console.log('[stripe] found existing order by session notes, reusing order:', ordersWithSession[0].id)
+                // treat as existingOrderId
+                
+                try {
+                  const found = await prisma.order.findUnique({ where: { id: ordersWithSession[0].id } })
+                  if (found) {
+                    const finalCustomerEmail = getStringFromRecord(customerDetails, 'email') || extractCustomerEmail(s.customer) || found.customerEmail
+                    const cdName = getStringFromRecord(customerDetails, 'name')
+                    const sessionName = (s.customer && typeof s.customer === 'object' && typeof (s.customer as Stripe.Customer).name === 'string') ? (s.customer as Stripe.Customer).name : undefined
+                    const dbName = found.customerName ?? ''
+                    const finalCustomerName: string = cdName ?? sessionName ?? dbName
+                    const cdPhone = getStringFromRecord(customerDetails, 'phone')
+                    const sessionPhone = (s.customer && typeof s.customer === 'object' && typeof (s.customer as Stripe.Customer).phone === 'string') ? (s.customer as Stripe.Customer).phone : undefined
+                    const dbPhone = found.customerPhone ?? ''
+                    const finalCustomerPhone: string = cdPhone ?? sessionPhone ?? dbPhone
+                      const metaExpectedTotal2 = s.metadata && s.metadata.expectedTotal ? parseInt(String(s.metadata.expectedTotal)) : undefined
+                      const resolvedTotalForNotesUpdate = metaExpectedTotal2 || s.amount_total || found.totalAmount
+                      if (metaExpectedTotal2 && metaExpectedTotal2 !== (s.amount_total || 0)) {
+                        console.warn('[stripe] metadata.expectedTotal differs from session.amount_total (notes match); using metadata as source-of-truth', { sessionId, metaExpectedTotal2, sessionAmount: s.amount_total })
+                      }
+                    order = await withRetries(() => prisma.order.update({
+                      where: { id: found.id },
+                      data: {
+                        status: 'paid',
+                        totalAmount: resolvedTotalForNotesUpdate,
+                        subtotal: resolvedTotalForNotesUpdate - shippingCost,
+                        shippingFee: shippingCost,
+                        customerEmail: finalCustomerEmail,
+                        customerName: finalCustomerName,
+                        customerPhone: finalCustomerPhone,
+                        shippingAddress: shippingAddress || found.shippingAddress,
+                        notes: `Stripe Session ID: ${sessionId}`,
+                        userId: matchedUserId ? matchedUserId : undefined
+                      }
+                    }))
+                    console.log('[stripe] updated existing order to paid (by notes):', found.id)
+                  }
+                } catch (err) {
+                  console.warn('[stripe] could not update existing order found by notes:', err)
+                }
+              }
+            } catch (noteSearchErr) {
+              console.warn('[stripe] error searching for existing order by session notes:', noteSearchErr)
+            }
+
+            // fallback to metadata.orderId if not found by notes
+            if (!order && existingOrderId) {
               try {
                 const found = await prisma.order.findUnique({ where: { id: existingOrderId } })
                 if (found) {
-                  const finalCustomerEmail = getStringFromRecord(customerDetails, 'email') || extractCustomerEmail(session.customer) || found.customerEmail
+                  const finalCustomerEmail = getStringFromRecord(customerDetails, 'email') || extractCustomerEmail(s.customer) || found.customerEmail
                   const cdName = getStringFromRecord(customerDetails, 'name')
-                  const sessionName = (session.customer && typeof session.customer === 'object' && typeof (session.customer as Stripe.Customer).name === 'string') ? (session.customer as Stripe.Customer).name : undefined
+                  const sessionName = (s.customer && typeof s.customer === 'object' && typeof (s.customer as Stripe.Customer).name === 'string') ? (s.customer as Stripe.Customer).name : undefined
                   const dbName = found.customerName ?? ''
                   const finalCustomerName: string = cdName ?? sessionName ?? dbName
                   const cdPhone = getStringFromRecord(customerDetails, 'phone')
-                  const sessionPhone = (session.customer && typeof session.customer === 'object' && typeof (session.customer as Stripe.Customer).phone === 'string') ? (session.customer as Stripe.Customer).phone : undefined
+                  const sessionPhone = (s.customer && typeof s.customer === 'object' && typeof (s.customer as Stripe.Customer).phone === 'string') ? (s.customer as Stripe.Customer).phone : undefined
                   const dbPhone = found.customerPhone ?? ''
                   const finalCustomerPhone: string = cdPhone ?? sessionPhone ?? dbPhone
+                  const metaExpectedTotal3 = s.metadata && s.metadata.expectedTotal ? parseInt(String(s.metadata.expectedTotal)) : undefined
+                  const resolvedTotalForMetaUpdate = metaExpectedTotal3 || s.amount_total || found.totalAmount
+                  if (metaExpectedTotal3 && metaExpectedTotal3 !== (s.amount_total || 0)) {
+                    console.warn('[stripe] metadata.expectedTotal differs from session.amount_total (metadata.orderId update); using metadata', { sessionId, metaExpectedTotal3, sessionAmount: s.amount_total })
+                  }
                   order = await withRetries(() => prisma.order.update({
                     where: { id: existingOrderId },
                     data: {
                       status: 'paid',
-                      totalAmount: session.amount_total || found.totalAmount,
-                      subtotal: (session.amount_total || found.totalAmount) - shippingCost,
+                      totalAmount: resolvedTotalForMetaUpdate,
+                      subtotal: resolvedTotalForMetaUpdate - shippingCost,
                       shippingFee: shippingCost,
                       customerEmail: finalCustomerEmail,
                       customerName: finalCustomerName,
                       customerPhone: finalCustomerPhone,
-                      shippingAddress: shippingAddress,
-                      notes: `Stripe Session ID: ${sessionId}`
+                      shippingAddress: shippingAddress || found.shippingAddress,
+                      notes: `Stripe Session ID: ${sessionId}`,
+                      userId: matchedUserId ? matchedUserId : undefined
                     }
                   }))
-                  console.log('[stripe] updated existing order to paid:', existingOrderId)
+                  console.log('[stripe] updated existing order to paid (by metadata.orderId):', existingOrderId)
                 }
               } catch (err) {
-                console.warn('[stripe] could not update existing order:', err)
+                console.warn('[stripe] could not update existing order (by metadata.orderId):', err)
               }
             }
 
@@ -589,26 +1088,33 @@ export const stripeProvider: Provider = {
               let finalCustomerPhone: string = ''
 
               try {
-                finalCustomerEmail = getStringFromRecord(customerDetails, 'email') || extractCustomerEmail(session.customer) || ''
+                finalCustomerEmail = getStringFromRecord(customerDetails, 'email') || extractCustomerEmail(s.customer) || ''
                 const cdName = getStringFromRecord(customerDetails, 'name')
-                const sessionName = (session.customer && typeof session.customer === 'object' && typeof (session.customer as Stripe.Customer).name === 'string') ? (session.customer as Stripe.Customer).name : undefined
+                const sessionName = (s.customer && typeof s.customer === 'object' && typeof (s.customer as Stripe.Customer).name === 'string') ? (s.customer as Stripe.Customer).name : undefined
                 finalCustomerName = cdName ?? sessionName ?? ''
                 const cdPhone = getStringFromRecord(customerDetails, 'phone')
-                const sessionPhone = (session.customer && typeof session.customer === 'object' && typeof (session.customer as Stripe.Customer).phone === 'string') ? (session.customer as Stripe.Customer).phone : undefined
+                const sessionPhone = (s.customer && typeof s.customer === 'object' && typeof (s.customer as Stripe.Customer).phone === 'string') ? (s.customer as Stripe.Customer).phone : undefined
                 finalCustomerPhone = cdPhone ?? sessionPhone ?? ''
 
+                const metaExpectedTotalNew = s.metadata && s.metadata.expectedTotal ? parseInt(String(s.metadata.expectedTotal)) : undefined
+                const resolvedTotalForCreate = metaExpectedTotalNew || s.amount_total || 0
+                if (metaExpectedTotalNew && metaExpectedTotalNew !== (s.amount_total || 0)) {
+                  console.warn('[stripe] metadata.expectedTotal differs from session.amount_total (creating new order); using metadata as source-of-truth', { sessionId, metaExpectedTotalNew, sessionAmount: s.amount_total })
+                }
                 order = await withRetries(() => prisma.order.create({
                   data: {
-                    totalAmount: session.amount_total || 0,
-                    currency: session.currency || 'jpy',
+                    totalAmount: resolvedTotalForCreate,
+                    currency: s.currency || 'jpy',
                     status: 'paid',
                     customerEmail: finalCustomerEmail,
                     customerName: finalCustomerName,
                     customerPhone: finalCustomerPhone,
-                    shippingAddress: shippingAddress,
-                    subtotal: (session.amount_total || 0) - shippingCost,
+                    // Use shippingAddress (possibly from metadata) when creating new order
+                    shippingAddress: shippingAddress || '',
+                    subtotal: (s.amount_total || 0) - shippingCost,
                     shippingFee: shippingCost,
-                    notes: `Stripe Session ID: ${sessionId}`
+                    notes: `Stripe Session ID: ${sessionId}`,
+                    userId: matchedUserId ? matchedUserId : undefined
                   }
                 }))
               } catch (orderCreateErr: any) {
@@ -617,12 +1123,12 @@ export const stripeProvider: Provider = {
                   sessionId,
                   existingOrderId: existingOrderId,
                   paymentIntentId,
-                  sessionAmount: session.amount_total,
-                  sessionCurrency: session.currency,
+                  sessionAmount: s.amount_total,
+                  sessionCurrency: s.currency,
                   customerEmail: finalCustomerEmail || 'undefined',
                   customerName: finalCustomerName || 'undefined',
                   customerPhone: finalCustomerPhone || 'undefined',
-                  shippingAddress: shippingAddress,
+                  shippingAddress: shippingAddress || '',
                   errCode: orderCreateErr?.code,
                   errMessage: orderCreateErr?.message,
                   errMeta: orderCreateErr?.meta,
@@ -636,10 +1142,10 @@ export const stripeProvider: Provider = {
             // ペイメントを作成（paymentIntentId を正しく保存）
             // payment_intent が無い、または paymentIntentId が空の場合は
             // session.payment_intent.latest_charge / charges 配列などから代替のIDを取得する
-            let resolvedStripeId: string | undefined = paymentIntentId
+              let resolvedStripeId: string | undefined = paymentIntentId
             try {
               if (!resolvedStripeId) {
-                const piRaw: unknown = session.payment_intent
+                const piRaw: unknown = s.payment_intent
                 const chargeId = getChargeIdFromPaymentIntent(piRaw)
                 stripeDebug('resolved chargeId from payment_intent candidate:', chargeId)
                 if (chargeId) resolvedStripeId = chargeId
@@ -648,32 +1154,171 @@ export const stripeProvider: Provider = {
               console.warn('[stripe] could not resolve stripe id from session/payment_intent:', resolveErr)
             }
 
+            // --- Ensure OrderItems exist: if the webhook-created/updated order has no items,
+            //     try to populate from expanded session.line_items
             try {
-              const payment = await withRetries(() => prisma.payment.create({
+              if (!order) {
+                console.warn('[stripe] skipping orderItems creation: order is null')
+              } else {
+                const existingItems = await prisma.orderItem.findMany({ where: { orderId: order.id } })
+                const rawLineItems = s.line_items && typeof s.line_items === 'object' && Array.isArray((s.line_items as any).data) ? (s.line_items as any).data : []
+                if ((existingItems.length === 0 || existingItems == null) && rawLineItems.length > 0) {
+                  const itemsToCreate = rawLineItems.map((li: any) => {
+                    const qty = li.quantity || 1
+                    const unitAmount = (li.price && typeof li.price === 'object' && typeof li.price.unit_amount === 'number') ? li.price.unit_amount : (li.amount_subtotal || li.amount || 0)
+                    let prodId: string | undefined = undefined
+                    try {
+                      if (li.price && typeof li.price === 'object') {
+                        const p = li.price as any
+                        if (p.metadata && (p.metadata.productId || p.metadata.product_id || p.metadata.sku)) {
+                          prodId = p.metadata.productId || p.metadata.product_id || p.metadata.sku
+                        }
+                        if (!prodId && p.product && typeof p.product === 'string') prodId = p.product
+                      }
+                    } catch (e) {
+                      // ignore
+                    }
+                    if (!prodId) prodId = li.description || `stripe_lineitem_${li.id}`
+
+                    return {
+                      orderId: order.id,
+                      productId: String(prodId), // temporary candidate, will map to real Product.id below
+                      quantity: qty,
+                      unitPrice: Math.round(unitAmount || 0),
+                      totalPrice: Math.round((unitAmount || 0) * qty)
+                    }
+                  })
+
+                  // Attempt to map candidate product identifiers to internal Product.id values.
+                  // If a matching Product cannot be found, create a placeholder Product so FK constraint is satisfied.
+                  try {
+                    console.log('[stripe] about to map product candidates for orderItems - orderId:', order.id, 'candidates:', itemsToCreate.map(i => i.productId))
+                    for (let i = 0; i < itemsToCreate.length; i++) {
+                      const candidate = itemsToCreate[i].productId
+                      try {
+                        // Try to find existing product by id (most likely when metadata carried internal id)
+                        let found: any = null
+                        try {
+                          found = await prisma.product.findUnique({ where: { id: String(candidate) } })
+                        } catch (e) {
+                          // ignore lookup errors
+                        }
+
+                        if (found && (found as any).id) {
+                          itemsToCreate[i].productId = (found as any).id
+                          continue
+                        }
+
+                        // Try to find an existing placeholder created earlier for this Stripe candidate
+                        try {
+                          const existingPlaceholder = await prisma.product.findFirst({ where: { description: { contains: `imported_from_stripe:${String(candidate)}` } } })
+                          if (existingPlaceholder && existingPlaceholder.id) {
+                            console.log('[stripe] reusing existing placeholder for candidate:', candidate, '->', existingPlaceholder.id)
+                            itemsToCreate[i].productId = existingPlaceholder.id
+                            continue
+                          }
+                        } catch (e) {
+                          // ignore lookup errors and proceed to create
+                        }
+
+                        // No product found by id or placeholder -> create a placeholder product using available info
+                        const li = rawLineItems[i] || {}
+                        const name = (li.description && typeof li.description === 'string') ? li.description : `Imported from Stripe (${String(candidate).slice(0,12)})`
+                        const priceVal = Math.round(itemsToCreate[i].unitPrice || 0)
+                        const placeholder = await prisma.product.create({ data: { name: name, description: `imported_from_stripe:${String(candidate)}`, price: priceVal } })
+                        console.log('[stripe] created placeholder product for stripe candidate:', candidate, '->', placeholder.id)
+                        itemsToCreate[i].productId = placeholder.id
+                      } catch (mapErr) {
+                        console.warn('[stripe] failed mapping/creating product for candidate:', candidate, mapErr)
+                        // leave candidate as-is; createMany will likely fail but we will catch and log below
+                      }
+                    }
+                  } catch (mapAllErr) {
+                    console.warn('[stripe] product mapping phase failed for order:', order.id, mapAllErr)
+                  }
+
+                  try {
+                    console.log('[stripe] about to create orderItems - orderId:', order.id, 'itemsToCreate.length:', itemsToCreate.length)
+                    console.log('[stripe] itemsToCreate sample:', itemsToCreate.map((i: any) => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice, totalPrice: i.totalPrice })).slice(0,50))
+                      try {
+                      const fs = await import('fs')
+                      const path = await import('path')
+                      const dbgPath = path.join(os.tmpdir(), 'stripe-handler-debug.log')
+                      const dbgEntry = JSON.stringify({ ts: new Date().toISOString(), action: 'about_to_create_order_items', orderId: order.id, itemsPreview: itemsToCreate.slice(0,10) }) + '\n'
+                      fs.appendFileSync(dbgPath, dbgEntry)
+                    } catch (e) { /* ignore */ }
+                    const createResult = await withRetries(() => prisma.orderItem.createMany({ data: itemsToCreate }))
+                    console.log('[stripe] createMany result for orderItems:', { orderId: order.id, result: createResult, createdCount: (createResult && (createResult as any).count) || null })
+                    try {
+                      const fs = await import('fs')
+                      const path = await import('path')
+                      const dbgPath = path.join(os.tmpdir(), 'stripe-handler-debug.log')
+                      const dbgEntry = JSON.stringify({ ts: new Date().toISOString(), action: 'created_order_items', orderId: order.id, result: createResult }) + '\n'
+                      fs.appendFileSync(dbgPath, dbgEntry)
+                    } catch (e) { /* ignore */ }
+                    console.log('[stripe] created orderItems from session.line_items for order:', order.id, { count: itemsToCreate.length })
+                  } catch (createItemsErr) {
+                    console.warn('[stripe] failed to create orderItems from line_items:', createItemsErr)
+                    try {
+                      console.error('[stripe] createItemsErr stack:', createItemsErr && (createItemsErr as any).stack ? (createItemsErr as any).stack : String(createItemsErr))
+                    } catch (e) { /* ignore */ }
+                      try {
+                      const fs = await import('fs')
+                      const path = await import('path')
+                      const errLogPath = path.join(os.tmpdir(), 'stripe-webhook-errors.jsonl')
+                      const errEntry = JSON.stringify({
+                        kind: 'create_order_items_failed',
+                        timestamp: new Date().toISOString(),
+                        eventId: payload?.id,
+                        sessionId,
+                        orderId: order?.id,
+                        itemsSample: Array.isArray(itemsToCreate) ? itemsToCreate.slice(0, 10) : undefined,
+                        error: {
+                          message: createItemsErr && (createItemsErr as any).message ? (createItemsErr as any).message : String(createItemsErr),
+                          code: createItemsErr && (createItemsErr as any).code ? (createItemsErr as any).code : null,
+                          meta: createItemsErr && (createItemsErr as any).meta ? (createItemsErr as any).meta : null,
+                          stack: createItemsErr && (createItemsErr as any).stack ? (createItemsErr as any).stack : null
+                        }
+                      }) + '\n'
+                      fs.appendFileSync(errLogPath, errEntry)
+                    } catch (logErr) {
+                      console.warn('[stripe] failed to write createItemsErr to tmp log:', logErr)
+                    }
+                  }
+                }
+              }
+            } catch (itemsCheckErr) {
+              console.warn('[stripe] could not ensure orderItems from session.line_items:', itemsCheckErr)
+            }
+
+            try {
+                    const payment = await withRetries(() => prisma.payment.create({
                 data: {
-                  orderId: order.id,
+                  orderId: order!.id,
                   stripeId: resolvedStripeId || undefined,
-                  amount: session.amount_total || 0,
-                  currency: session.currency || 'jpy',
+                  amount: s.amount_total || 0,
+                  currency: s.currency || 'jpy',
                   status: 'succeeded'
                 }
               }))
+              const paymentAny: any = payment as any
+              if (!order) throw new Error('order not set after create/update')
               console.log('[stripe] created order and payment for session:', sessionId, {
                 customerEmail: customerDetails?.email,
                 customerName: customerDetails?.name,
                 customerPhone: customerDetails?.phone,
-                shippingAddress: shippingAddress,
+                    shippingAddress: shippingAddress || '',
                 orderId: order.id,
-                paymentId: payment.id,
-                stripeId: payment.stripeId,
+                paymentId: paymentAny.id,
+                stripeId: paymentAny.stripeId,
                 timestamp: new Date().toISOString()
               })
 
               // 決済完了後に配送を作成
               try {
-                const deliveryService = session.metadata?.deliveryService || 'japanpost'
-                const weightGrams = parseInt(session.metadata?.weightGrams || '500')
-                const postalCode = session.metadata?.postalCode || ''
+          const deliveryService = s.metadata?.deliveryService || 'japanpost'
+        const weightGrams = parseInt(s.metadata?.weightGrams || '500')
+        const postalCode = s.metadata?.postalCode || ''
 
                 if (shippingAddress && postalCode) {
                   console.log('[stripe] creating delivery for order:', order.id, {
@@ -744,8 +1389,8 @@ export const stripeProvider: Provider = {
                 paymentIntentId,
                 resolvedStripeId,
                 orderId: order?.id,
-                sessionAmount: session.amount_total,
-                sessionCurrency: session.currency,
+                sessionAmount: s.amount_total,
+                sessionCurrency: s.currency,
                 errCode: paymentCreateErr?.code,
                 errMessage: paymentCreateErr?.message,
                 errMeta: paymentCreateErr?.meta,
@@ -777,6 +1422,25 @@ export const stripeProvider: Provider = {
       console.log('[stripe] successfully processed event:', payload.id)
     } catch (err) {
       console.error('[stripe] handleWebhookEvent error:', err)
+      try {
+  const fs = await import('fs')
+  const path = await import('path')
+  const errLogPath = path.join(os.tmpdir(), 'stripe-webhook-errors.jsonl')
+        const errMessage = (err && typeof err === 'object' && 'message' in err) ? (err as any).message : String(err)
+        const errStack = (err && typeof err === 'object' && 'stack' in err) ? (err as any).stack : null
+        const errEntry = JSON.stringify({
+          kind: 'handler_exception',
+          timestamp: new Date().toISOString(),
+          error: {
+            message: errMessage,
+            stack: errStack
+          },
+          payloadSample: (payload && typeof payload === 'object') ? { id: payload.id, type: payload.type, dataKeys: Object.keys(payload.data || {}) } : { raw: String(payload).slice(0, 200) }
+        }) + '\n'
+        fs.appendFileSync(errLogPath, errEntry)
+      } catch (logErr) {
+        console.warn('[stripe] failed to write handler exception to tmp log:', logErr)
+      }
       throw err
     }
   },

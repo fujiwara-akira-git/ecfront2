@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { useCart } from '@/app/contexts/CartContext'
+import { useSession } from 'next-auth/react'
 
 interface SuccessClientProps {
   sessionId: string
@@ -9,6 +10,7 @@ interface SuccessClientProps {
 
 export default function SuccessClient({ sessionId }: SuccessClientProps) {
   const { clearCart } = useCart()
+  const { status } = useSession()
 
   useEffect(() => {
     // 決済成功時にカートを一度だけクリア（localStorage ガード）
@@ -17,6 +19,9 @@ export default function SuccessClient({ sessionId }: SuccessClientProps) {
       const key = `checkout_cleared_${sessionId}`
       const already = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null
       if (already) return
+      // Wait until session status is resolved so clearCart can call server API when
+      // the user is authenticated. If session status is still loading, defer.
+      if (status === 'loading') return
       // 実行してフラグを立てる
       clearCart()
         .then(() => {
@@ -26,7 +31,7 @@ export default function SuccessClient({ sessionId }: SuccessClientProps) {
     } catch (err) {
       console.error('SuccessClient clearCart error', err)
     }
-  }, [sessionId, clearCart])
+  }, [sessionId, clearCart, status])
 
   return null // このコンポーネントはUIを表示しない
 }

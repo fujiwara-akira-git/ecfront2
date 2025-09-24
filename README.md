@@ -48,8 +48,12 @@ Password: customer123
 - **[開発ガイドライン](./docs/development-guidelines.md)** - 開発・運用のベストプラクティス
 - **[ドキュメント一覧](./docs/README.md)** - 全ドキュメントの詳細索引
 
+- **[Operations & Recent Actions](./docs/operations.md)** - Recent debugging and maintenance notes (webhook logs, signature verification, deletion results)
+
 - **[リファクタ計画](./docs/REFACTOR_PLAN.md)** - 今後のリファクタ計画と手順
 - **[配送ドキュメント](./docs/delivery.md)** - 配送プロバイダ実装の詳細
+
+- **[ローカル HTTPS 手順](./docs/local-https.md)** - 開発時に `https://localhost:3000` を再現する手順（mkcert + proxy 等）
 
 ## 🔧 技術スタック
 
@@ -118,7 +122,7 @@ npm start
 
 Vercel上の本番環境でテストする場合は、以下URLにアクセスしてください：
 
-```
+```text
 https://ecfront-main2.vercel.app
 ```
 
@@ -157,3 +161,31 @@ npm run lint              # リント実行
 ---
 
 Happy Development! 🚀
+
+# Local restore and temporary password steps
+
+This file documents safe steps to set a temporary password for an existing user in the local development database.
+
+Steps:
+
+1. Backup the database (recommended):
+
+```bash
+pg_dump "postgresql://dev:dev@127.0.0.1:5432/dev" -Fc -f dev-backup.dump
+```
+
+1. Verify the target user exists and see current state:
+
+```bash
+psql "postgresql://dev:dev@127.0.0.1:5432/dev" -c "SELECT id, email, (password IS NOT NULL) AS has_password FROM \"User\" WHERE lower(email) = 'customer2@example.com';"
+```
+
+1. Apply temporary password (example):
+
+Replace `<BCRYPT_HASH>` with the generated hash printed by the earlier step.
+
+```bash
+psql "postgresql://dev:dev@127.0.0.1:5432/dev" -c "UPDATE \"User\" SET password = '<BCRYPT_HASH>' WHERE lower(email) = 'customer2@example.com';"
+```
+
+1. Notify user of temporary password and force password reset when appropriate.

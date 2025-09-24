@@ -1,5 +1,5 @@
 import Stripe from 'stripe'
-import { prisma } from '../lib/prisma'
+import { prisma } from '../../lib/prisma'
 
 // Usage: node ./scripts/backfill-stripe-ids.ts [--apply]
 // Requires STRIPE_SECRET_KEY and DATABASE_URL in environment.

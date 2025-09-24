@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../api/auth/options'
 import { prisma } from '@/lib/prisma'
-import type { Order, FavoriteProducer, Producer } from '@prisma/client'
+import { convertToJPY, formatCurrency } from '@/lib/currency'
+import type { Order, FavoriteProducer, Producer, Payment } from '@prisma/client'
 
 export default async function MyPage() {
   const session = await getServerSession(authOptions)
@@ -22,9 +23,20 @@ export default async function MyPage() {
   }
 
   // Try to load recent orders for this user (if order model exists)
-  let orders: Order[] = []
+  // Show orders where userId matches OR where customerEmail matches the logged-in user's email.
+  let orders: (Order & { payments: Payment[] })[] = []
   try {
-    orders = await prisma.order.findMany({ where: { userId: session.user.id }, orderBy: { createdAt: 'desc' }, take: 10 })
+    const userEmail = session.user.email
+    const whereClause = userEmail
+      ? { OR: [{ userId: session.user.id }, { customerEmail: userEmail }] }
+      : { userId: session.user.id }
+    // prisma.order.findMany expects a typed where; cast to any to avoid TS issues in edge cases
+    orders = await prisma.order.findMany({
+      where: whereClause as any,
+      include: { payments: true },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    })
   } catch (err) {
     // ignore if no order model or DB issue; show empty state
     // eslint-disable-next-line no-console
@@ -50,8 +62,8 @@ export default async function MyPage() {
 
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-xl font-medium">アカウント情報</h2>
-          <p className="mt-2 text-gray-700">{session.user.name || session.user.email}</p>
-          <p className="mt-1 text-sm text-gray-600">{session.user.email}</p>
+          <p className="mt-2 text-gray-700">{session.user?.name || session.user?.email || 'Unknown User'}</p>
+          <p className="mt-1 text-sm text-gray-600">{session.user?.email || ''}</p>
           <div className="mt-4">
             <Link href="/shop/mypage/profile" className="text-emerald-600 font-medium">プロフィールを編集</Link>
           </div>
@@ -67,8 +79,24 @@ export default async function MyPage() {
                 <li key={o.id} className="border rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="font-medium">注文 #{o.id}</div>
-                      <div className="text-sm text-gray-600">合計: ¥{(o.total || o.amount_total || 0).toLocaleString()}</div>
+                      <div className="font-medium">注文 <Link href={`/shop/mypage/orders/${o.id}`} className="text-emerald-600">#{o.id}</Link></div>
+                      <div className="text-sm text-gray-600">
+                        合計: {(() => {
+                          // 決済された金額（Payment.amount）を優先的に使用
+                          const payment = o.payments && o.payments.length > 0 ? o.payments[0] : null
+                          const amount = payment ? payment.amount : (o.totalAmount || o.total || o.amount_total || 0)
+                          const currency = payment ? payment.currency : (o.currency || 'JPY')
+
+                          // currencyがundefinedでないことを確認
+                          if (!currency) {
+                            return `¥${(amount || 0).toLocaleString()}`
+                          }
+
+                          return currency.toLowerCase() === 'usd'
+                            ? `¥${convertToJPY(amount || 0, currency).toLocaleString()}`
+                            : formatCurrency(amount || 0, currency)
+                        })()}
+                      </div>
                     </div>
                     <div className="text-sm text-gray-500">{new Date(o.createdAt).toLocaleString()}</div>
                   </div>
@@ -86,7 +114,7 @@ export default async function MyPage() {
             <ul className="space-y-3">
               {favorites.map((f: any) => (
                 <li key={f.id} className="border rounded-lg p-3">
-                  <Link href={`/shop/producer/${f.producer.id}`} className="font-medium">{f.producer.name}</Link>
+                  <Link href={`/shop/producer/${f.producer?.id || ''}`} className="font-medium">{f.producer?.name || 'Unknown Producer'}</Link>
                 </li>
               ))}
             </ul>

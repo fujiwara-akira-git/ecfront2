@@ -1,8 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 
 export default function ShopSignUpPage() {
   // (自動上書きに切り替え) ユーザー編集フラグは不要
@@ -44,7 +42,7 @@ export default function ShopSignUpPage() {
   })
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
+  // router removed: use full reload after registration to ensure server session is applied
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -98,29 +96,22 @@ export default function ShopSignUpPage() {
       })
 
       if (response.ok) {
-        // 登録成功後、自動ログイン
-        const result = await signIn('credentials', {
-          email: formData.email,
-          password: formData.password,
-          redirect: false
-        })
-
-        if (result?.ok) {
-          router.push('/shop')
-        } else {
-          setError('登録は完了しましたが、ログインに失敗しました。再度ログインしてください。')
-        }
+        // 登録成功後はサーバ側でセッションCookieが返されるため
+        // クライアント側で追加の signIn は不要。
+        // クライアントナビゲーションだと初期サーバセッションが
+        // 反映されないケースがあるためフルリロードで移動します。
+        window.location.replace('/shop')
       } else {
-        const data = await response.json()
-        setError(data.message || '登録に失敗しました')
+        const data = await response.json().catch(() => ({}))
+        setError(data?.message || '登録に失敗しました')
       }
-    } catch (error) {
-      setError('エラーが発生しました。')
+    } catch (err) {
+      setError('登録中にエラーが発生しました')
     } finally {
       setIsLoading(false)
     }
-  }
 
+  }
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-lime-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-lg w-full space-y-8">

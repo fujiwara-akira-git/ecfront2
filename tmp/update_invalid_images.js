@@ -21,7 +21,7 @@ function loadEnvFile(p) {
   return env
 }
 
-;(async () => {
+(async () => {
   try {
     const repoRoot = process.cwd()
     const envPath = path.join(repoRoot, '.env.local')

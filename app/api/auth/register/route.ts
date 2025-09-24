@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { encode } from 'next-auth/jwt'
 import { prisma } from '@/lib/prisma'
 import bcryptjs from 'bcryptjs'
 import type { Prisma } from '@prisma/client'
@@ -6,6 +7,8 @@ import type { Prisma } from '@prisma/client'
 export async function POST(request: NextRequest) {
   try {
   const { name, email, password, phone, address, postalCode, userType = 'customer', adminCode } = await request.json()
+    // 正規化: 大文字小文字や余分な空白での不一致を防ぐ
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : email
 
     // バリデーション
     if (!name || !email || !password || !phone || !address || !postalCode) {
@@ -52,9 +55,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 既存ユーザーのチェック
+    // 既存ユーザーのチェック（正規化済みメールで検索）
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email: normalizedEmail }
     })
 
     if (existingUser) {
@@ -71,7 +74,7 @@ export async function POST(request: NextRequest) {
     // Prisma の User モデルに存在しないフィールド (state, city) は渡さない
     const userData: Prisma.UserCreateInput = {
       name,
-      email,
+      email: normalizedEmail,
       password: hashedPassword,
       phone,
       address,
@@ -101,20 +104,79 @@ export async function POST(request: NextRequest) {
   userType: newUser.userType 
     })
 
-    return NextResponse.json(
-      { 
-        message: 'アカウントが作成されました。ログインしてください。',
-        user: {
-          id: newUser.id,
-          name: newUser.name,
-          email: newUser.email,
-          address: newUser.address,
-          postalCode: newUser.postalCode,
-          userType: newUser.userType
-        }
-      },
-      { status: 201 }
-    )
+    // Server-side: create a NextAuth JWT and set it as an HttpOnly cookie so
+    // the user is logged-in immediately after registration.
+    try {
+      const maxAge = 60 * 60 * 24 * 30 // 30 days
+      const token = {
+        sub: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: (newUser.userType || 'customer').toUpperCase(),
+      }
+
+      const secret = process.env.NEXTAUTH_SECRET
+      if (!secret || typeof secret !== 'string') {
+        throw new Error('NEXTAUTH_SECRET is not set')
+      }
+      const encoded = await encode({ token, secret, maxAge })
+
+      const res = NextResponse.json(
+        {
+          message: 'アカウントが作成されました。ログインしました。',
+          user: {
+            id: newUser.id,
+            name: newUser.name,
+            email: newUser.email,
+            address: newUser.address,
+            postalCode: newUser.postalCode,
+            userType: newUser.userType
+          }
+        },
+        { status: 201 }
+      )
+
+      // Cookie name and Secure flag: prefer to determine by actual request protocol
+      // so that in local HTTP dev we don't emit Secure cookies (which browsers
+      // will ignore) even if NEXTAUTH_URL env was set to https for other reasons.
+      let isHttpsRequest = false
+      try {
+        const u = new URL(request.url)
+        isHttpsRequest = u.protocol === 'https:'
+      } catch (e) {
+        isHttpsRequest = false
+      }
+
+      const useSecure = (process.env.NODE_ENV === 'production') || isHttpsRequest || (process.env.NEXTAUTH_URL && String(process.env.NEXTAUTH_URL).startsWith('https'))
+      const cookieName = useSecure ? '__Secure-next-auth.session-token' : 'next-auth.session-token'
+
+      res.cookies.set(cookieName, encoded ?? '', {
+        httpOnly: true,
+        maxAge,
+        path: '/',
+        sameSite: 'lax',
+        secure: !!useSecure,
+      })
+
+      return res
+    } catch (err) {
+      console.error('セッション発行エラー:', err)
+      // フォールバック: cookie を返さず登録成功レスポンスのみ
+      return NextResponse.json(
+        {
+          message: 'アカウントが作成されました。ログインしてください。',
+          user: {
+            id: newUser.id,
+            name: newUser.name,
+            email: newUser.email,
+            address: newUser.address,
+            postalCode: newUser.postalCode,
+            userType: newUser.userType
+          }
+        },
+        { status: 201 }
+      )
+    }
   } catch (error) {
     console.error('Registration error:', error)
     return NextResponse.json(
