@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { convertToJPY, formatCurrency } from '@/lib/currency'
-import { extractPostalCode } from '@/lib/address'
+import { extractPostalCode, splitJapaneseAddress } from '@/lib/address'
 
 export async function generateMetadata({ params }: any): Promise<Metadata> {
   const { id } = await params
@@ -46,7 +46,16 @@ export default async function OrderDetail({ params }: any) {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="text-sm text-gray-600">注文日: {new Date(order.createdAt).toLocaleString()}</div>
           <div className="mt-2">名前: {order.customerName || order.customerEmail}</div>
-          <div>住所: {order.shippingAddress || '—'}</div>
+          <div>住所: {(() => {
+            const raw = order.shippingAddress || ''
+            if (!raw) return '—'
+            const parts = splitJapaneseAddress(raw)
+            const pieces: string[] = []
+            if (parts.prefecture) pieces.push(parts.prefecture)
+            if (parts.city) pieces.push(parts.city)
+            if (parts.rest) pieces.push(parts.rest)
+            return pieces.length > 0 ? pieces.join(' ') : raw
+          })()}</div>
           <div>電話番号: {order.customerPhone || '—'}</div>
                   <div>郵便番号: {(() => {
                     // Try shippingAddress parsing, then order.postalCode, then user.postalCode

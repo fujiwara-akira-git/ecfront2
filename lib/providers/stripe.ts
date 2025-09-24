@@ -361,12 +361,17 @@ async function resolveOrCreateOrder(session: ExpandedCheckoutSession | null, pay
             const sessionPhone = (s.customer && typeof s.customer === 'object' && typeof (s.customer as Stripe.Customer).phone === 'string') ? (s.customer as Stripe.Customer).phone : undefined
             const dbPhone = found.customerPhone ?? ''
             const finalCustomerPhone: string = cdPhone ?? sessionPhone ?? dbPhone
+            // Try to resolve postal code from multiple sources: customer_details.address, session metadata, or payload
+            const addrSrcForUpdate = getAddressFromUnknown((s && s.customer_details) ? (s.customer_details as unknown as Record<string, unknown>)['address'] : undefined)
+            const metaPostalForUpdate = s && s.metadata && (s.metadata.postalCode || s.metadata.postal_code) ? String(s.metadata.postalCode || s.metadata.postal_code) : (payloadAny?.data?.object && payloadAny.data.object.metadata && (payloadAny.data.object.metadata.postalCode || payloadAny.data.object.metadata.postal_code) ? String(payloadAny.data.object.metadata.postalCode || payloadAny.data.object.metadata.postal_code) : undefined)
+            const sessionShippingAddrForUpdate = (s && (s as any).shipping_details && (s as any).shipping_details.address) ? (s as any).shipping_details.address : undefined
+            const resolvedPostalForUpdate = (addrSrcForUpdate && addrSrcForUpdate.postal_code) ? addrSrcForUpdate.postal_code : (metaPostalForUpdate ? metaPostalForUpdate : (sessionShippingAddrForUpdate && sessionShippingAddrForUpdate.postal_code ? sessionShippingAddrForUpdate.postal_code : undefined))
             const metaExpectedTotal = s.metadata && s.metadata.expectedTotal ? parseInt(String(s.metadata.expectedTotal)) : undefined
             const resolvedTotalForUpdate = metaExpectedTotal || s.amount_total || found.totalAmount
             if (metaExpectedTotal && metaExpectedTotal !== (s.amount_total || 0)) {
               console.warn('[stripe] metadata.expectedTotal differs from session.amount_total; using metadata as source-of-truth for order total', { sessionId, metaExpectedTotal, sessionAmount: s.amount_total })
             }
-            order = await withRetries(() => prisma.order.update({ where: { id: found.id }, data: { status: 'paid', totalAmount: resolvedTotalForUpdate, subtotal: resolvedTotalForUpdate - (s.shipping_cost?.amount_total || 0), shippingFee: s.shipping_cost?.amount_total || 0, customerEmail: finalCustomerEmail, customerName: finalCustomerName, customerPhone: finalCustomerPhone, shippingAddress: shippingAddress || found.shippingAddress, notes: `Stripe Session ID: ${sessionId}`, userId: matchedUserId ? matchedUserId : undefined } }))
+            order = await withRetries(() => prisma.order.update({ where: { id: found.id }, data: { status: 'paid', totalAmount: resolvedTotalForUpdate, subtotal: resolvedTotalForUpdate - (s.shipping_cost?.amount_total || 0), shippingFee: s.shipping_cost?.amount_total || 0, customerEmail: finalCustomerEmail, customerName: finalCustomerName, customerPhone: finalCustomerPhone, shippingAddress: shippingAddress || found.shippingAddress, postalCode: resolvedPostalForUpdate || found.postalCode, notes: `Stripe Session ID: ${sessionId}`, userId: matchedUserId ? matchedUserId : undefined } }))
             console.log('[stripe] reused existing order found via payment.stripeId:', found.id)
           }
         } catch (e) {
@@ -384,7 +389,12 @@ async function resolveOrCreateOrder(session: ExpandedCheckoutSession | null, pay
       try {
         const found = await prisma.order.findUnique({ where: { id: existingOrderId } })
         if (found) {
-          order = await withRetries(() => prisma.order.update({ where: { id: found.id }, data: { status: 'paid', shippingAddress: shippingAddress || found.shippingAddress, userId: matchedUserId ? matchedUserId : undefined, notes: sessionId ? `Stripe Session ID: ${sessionId}` : found.notes } }))
+          // resolve possible postal code similarly when updating via metadata.orderId
+          const addrSrcForMeta = getAddressFromUnknown((s && s.customer_details) ? (s.customer_details as unknown as Record<string, unknown>)['address'] : undefined)
+          const metaPostalForMeta = s && s.metadata && (s.metadata.postalCode || s.metadata.postal_code) ? String(s.metadata.postalCode || s.metadata.postal_code) : (payloadAny?.data?.object && payloadAny.data.object.metadata && (payloadAny.data.object.metadata.postalCode || payloadAny.data.object.metadata.postal_code) ? String(payloadAny.data.object.metadata.postalCode || payloadAny.data.object.metadata.postal_code) : undefined)
+          const sessionShippingAddrForMeta = (s && (s as any).shipping_details && (s as any).shipping_details.address) ? (s as any).shipping_details.address : undefined
+          const resolvedPostalForMeta = (addrSrcForMeta && addrSrcForMeta.postal_code) ? addrSrcForMeta.postal_code : (metaPostalForMeta ? metaPostalForMeta : (sessionShippingAddrForMeta && sessionShippingAddrForMeta.postal_code ? sessionShippingAddrForMeta.postal_code : undefined))
+          order = await withRetries(() => prisma.order.update({ where: { id: found.id }, data: { status: 'paid', shippingAddress: shippingAddress || found.shippingAddress, postalCode: resolvedPostalForMeta || found.postalCode, userId: matchedUserId ? matchedUserId : undefined, notes: sessionId ? `Stripe Session ID: ${sessionId}` : found.notes } }))
           console.log('[stripe] reused existing order via metadata.orderId:', found.id)
         }
       } catch (e) {
@@ -408,6 +418,11 @@ async function resolveOrCreateOrder(session: ExpandedCheckoutSession | null, pay
 
   const metaExpectedTotalNew = s && s.metadata && s.metadata.expectedTotal ? parseInt(String(s.metadata.expectedTotal)) : undefined
   const resolvedTotalForCreate = metaExpectedTotalNew || s.amount_total || 0
+      // try to resolve postal code for creation
+      const addrSrcForCreate = getAddressFromUnknown((s && s.customer_details) ? (s.customer_details as unknown as Record<string, unknown>)['address'] : undefined)
+      const metaPostalForCreate = s && s.metadata && (s.metadata.postalCode || s.metadata.postal_code) ? String(s.metadata.postalCode || s.metadata.postal_code) : (payloadAny?.data?.object && payloadAny.data.object.metadata && (payloadAny.data.object.metadata.postalCode || payloadAny.data.object.metadata.postal_code) ? String(payloadAny.data.object.metadata.postalCode || payloadAny.data.object.metadata.postal_code) : undefined)
+      const sessionShippingAddrForCreate = (s && (s as any).shipping_details && (s as any).shipping_details.address) ? (s as any).shipping_details.address : undefined
+      const resolvedPostalForCreate = (addrSrcForCreate && addrSrcForCreate.postal_code) ? addrSrcForCreate.postal_code : (metaPostalForCreate ? metaPostalForCreate : (sessionShippingAddrForCreate && sessionShippingAddrForCreate.postal_code ? sessionShippingAddrForCreate.postal_code : undefined))
       order = await withRetries(() => prisma.order.create({
         data: {
           totalAmount: resolvedTotalForCreate,
@@ -417,6 +432,7 @@ async function resolveOrCreateOrder(session: ExpandedCheckoutSession | null, pay
           customerName: finalCustomerName,
           customerPhone: finalCustomerPhone,
           shippingAddress: shippingAddress || (s && s.metadata && s.metadata.shippingAddress) || '',
+          postalCode: resolvedPostalForCreate || (s && s.metadata && (s.metadata.postalCode || s.metadata.postal_code)) || undefined,
           subtotal: (s && s.amount_total || 0) - (s && s.shipping_cost ? s.shipping_cost.amount_total || 0 : 0),
           shippingFee: s && s.shipping_cost ? s.shipping_cost.amount_total || 0 : 0,
           notes: sessionId ? `Stripe Session ID: ${sessionId}` : 'created_by_resolveOrCreateOrder',
@@ -522,6 +538,7 @@ export const stripeProvider: Provider = {
         customerName: order.customerInfo?.name || (order.metadata && order.metadata.userName) || '',
         customerPhone: order.customerInfo?.phone || '',
         shippingAddress: order.customerInfo?.address || (order.metadata && order.metadata.shippingAddress) || '',
+        postalCode: order.customerInfo?.postalCode || (order.metadata && (order.metadata.postalCode || order.metadata.postal_code)) || undefined,
         subtotal: subtotalCalc,
         shippingFee: shippingFeeCalc,
         notes: 'Created before checkout session',
