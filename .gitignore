@@ -37,3 +37,9 @@ lib/generated/prisma
 .vercel
 .prisma
 .env*.local
+
+# Test / reports / temp artifacts
+/test-results/
+/playwright-report/
+/tmp/
+tsconfig.tsbuildinfo
