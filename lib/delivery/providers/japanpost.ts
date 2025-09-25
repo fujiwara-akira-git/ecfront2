@@ -186,11 +186,17 @@ export const japanPostProvider: DeliveryProvider = {
       return false
     }
   },
-  async handleWebhookEvent(body: any) {
+  async handleWebhookEvent(body: unknown) {
     try {
       console.log('Japan Post webhook event received:', body)
 
-      if (!body || !body.deliveryId) {
+      if (!body || typeof body !== 'object') {
+        console.error('Invalid webhook payload: not an object')
+        return
+      }
+      const b = body as Record<string, unknown>
+      const deliveryId = typeof b.deliveryId === 'string' ? b.deliveryId : null
+      if (!deliveryId) {
         console.error('Invalid webhook payload: missing deliveryId')
         return
       }
@@ -198,20 +204,20 @@ export const japanPostProvider: DeliveryProvider = {
       // TODO: Firestoreやデータベースで配送ステータスを更新
       // ここではログ出力のみ
       console.log('Japan Post delivery status update:', {
-        deliveryId: body.deliveryId,
-        status: body.status || 'updated',
-        eventType: body.eventType || null,
-        trackingNumber: body.trackingNumber || null
+        deliveryId,
+        status: (typeof b.status === 'string' && b.status) || 'updated',
+        eventType: typeof b.eventType === 'string' ? b.eventType : null,
+        trackingNumber: typeof b.trackingNumber === 'string' ? b.trackingNumber : null
       })
 
       // Firestore更新（必要に応じて）
       try {
         await prisma.delivery.updateMany({
-          where: { id: body.deliveryId },
+          where: { id: deliveryId },
           data: {
-            status: body.status || 'updated',
-            trackingNumber: body.trackingNumber || null,
-            raw: { ...(body.raw || {}), lastEvent: body.eventType || null },
+            status: (typeof b.status === 'string' && b.status) || 'updated',
+            trackingNumber: typeof b.trackingNumber === 'string' ? b.trackingNumber : null,
+            raw: { ...((b.raw && typeof b.raw === 'object') ? b.raw as Record<string, unknown> : {}), lastEvent: typeof b.eventType === 'string' ? b.eventType : null },
             updatedAt: new Date()
           }
         })

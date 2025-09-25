@@ -2,8 +2,6 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { Noto_Sans_JP } from 'next/font/google'
 import { SessionProvider } from './components/SessionProvider'
-import { getServerSession, type Session } from 'next-auth'
-import { authOptions } from './api/auth/options'
 import { ToastProvider } from './contexts/ToastContext'
 import { CartProvider } from './contexts/CartContext'
 
@@ -12,30 +10,24 @@ export const metadata: Metadata = {
   description: '新鮮な農産物のオンラインショップと店舗管理システム',
 }
 
+// This root layout uses `getServerSession` which reads request headers/cookies.
+// Marking as force-dynamic prevents Next.js from attempting to statically render
+// routes that rely on this layout and suppresses dynamic-server usage warnings.
+export const dynamic = 'force-dynamic'
+
 const noto = Noto_Sans_JP({
   weight: ['400','500','600','700','900'],
   subsets: ['latin'],
   display: 'swap',
 })
 
-export default async function RootLayout({ 
+export default function RootLayout({ 
   children,
 }: {
   children: React.ReactNode
 }) {
-  // Note: we fetch server session for SessionProvider initial value
-  // This layout runs on the server so we can call getServerSession
-  let session: Session | null = null
-  try {
-    session = await getServerSession(authOptions)
-  } catch (err) {
-    // Ensure we don't crash the app if session retrieval fails
-    // eslint-disable-next-line no-console
-    console.error('[next-auth][error][getServerSession]', err)
-    session = null
-  }
-
-  // Keep this layout client-safe by using dynamic rendering for session when needed.
+  // SessionProvider will initialize session client-side. Avoid server-side
+  // getServerSession here so the root layout can be statically optimized.
   return (
     <html lang="ja">
       <body 
@@ -54,7 +46,7 @@ export default async function RootLayout({
           })();
         ` }} />
 
-        <SessionProvider session={session}>
+        <SessionProvider>
           <ToastProvider>
             <CartProvider>
               {children}

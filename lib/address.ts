@@ -148,3 +148,32 @@ export function formatJapaneseAddress(shippingAddress?: string, userAddress?: st
   return parts.join(' ').trim()
 }
 
+// Small best-effort postal code -> prefecture/city mapping for cases where
+// the shippingAddress itself is too short (e.g. "桜田") but postalCode is
+// available. This map is intentionally small and can be extended as needed.
+const POSTAL_TO_AREA: Record<string, { prefecture?: string; city?: string }> = {
+  // examples observed in local test data
+  '3400203': { prefecture: '埼玉県', city: '久喜市' }, // 340-0203 桜田
+  '1040061': { prefecture: '東京都', city: '中央区' }, // 104-0061 銀座
+  '3400204': { prefecture: '埼玉県', city: '久喜市' }, // 340-0204 上川崎
+  '3400205': { prefecture: '埼玉県', city: '久喜市' }, // 340-0205 外野
+  '3400202': { prefecture: '埼玉県', city: '久喜市' }, // 340-0202 東大輪
+}
+
+export function lookupAreaFromPostal(postal?: string): { prefecture?: string; city?: string } | undefined {
+  if (!postal) return undefined
+  // normalize: remove non-digits
+  const raw = String(postal).replace(/[^0-9]/g, '')
+  if (raw.length < 3) return undefined
+  // Try exact 7-digit key first
+  if (raw.length >= 7) {
+    const seven = raw.slice(0, 7)
+    if (POSTAL_TO_AREA[seven]) return POSTAL_TO_AREA[seven]
+  }
+  // Try 3-digit prefix (less precise) - not populated by default,
+  // kept for future extension
+  const three = raw.slice(0, 3)
+  if (POSTAL_TO_AREA[three]) return POSTAL_TO_AREA[three]
+  return undefined
+}
+

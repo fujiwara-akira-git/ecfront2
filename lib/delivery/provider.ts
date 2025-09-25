@@ -13,7 +13,7 @@ export type RateQuote = {
   amount: number
   currency: string
   eta?: string
-  meta?: Record<string, any>
+  meta?: Record<string, unknown>
 }
 
 export type ShipmentRequest = {
@@ -29,6 +29,7 @@ export type ShipmentResponse = {
   deliveryId: string
   trackingNumber?: string
   labelUrl?: string
+  raw?: unknown
 }
 
 export interface DeliveryProvider {
@@ -36,5 +37,5 @@ export interface DeliveryProvider {
   getRates(req: { origin: Address; destination: Address; weightGrams?: number }): Promise<RateQuote[]>
   createShipment(req: ShipmentRequest): Promise<ShipmentResponse>
   verifyWebhook(headers: Record<string,string>, body: Buffer | string): Promise<boolean>
-  handleWebhookEvent(body: any): Promise<void>
+  handleWebhookEvent(body: unknown): Promise<void>
 }

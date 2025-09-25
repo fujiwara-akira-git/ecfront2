@@ -3,8 +3,10 @@ import { yamatoProvider } from '../../../../lib/delivery/providers/yamato'
 import { japanPostProvider } from '../../../../lib/delivery/providers/japanpost'
 import { createDoc } from '../../../../lib/firestoreRest'
 import { prisma } from '../../../../lib/prisma'
+import { DeliveryProvider } from '../../../../lib/delivery/provider'
+import { Prisma } from '@prisma/client'
 
-const providerMap: Record<string, any> = { yamato: yamatoProvider, japanpost: japanPostProvider }
+const providerMap: Record<string, DeliveryProvider> = { yamato: yamatoProvider, japanpost: japanPostProvider }
 
 export async function POST(req: Request) {
   const body = await req.json()
@@ -28,7 +30,7 @@ export async function POST(req: Request) {
           serviceCode,
           trackingNumber: resp.trackingNumber || null,
           status: 'pending',
-          raw: resp.raw || null,
+          raw: resp.raw ? (resp.raw as Prisma.InputJsonValue) : Prisma.JsonNull,
         },
       })
       return NextResponse.json({ ok: true, deliveryId: created.id, trackingNumber: created.trackingNumber })

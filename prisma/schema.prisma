@@ -117,6 +117,12 @@ model Order {
   subtotal        Int
   totalAmount     Int
   postalCode      String?
+  shippingPrefecture String?
+  shippingCity       String?
+  shippingRest       String?
+  // Indicates the order was pre-created on the server before redirecting to Stripe
+  // (i.e. created prior to the checkout session and will be completed by webhook)
+  preCreated       Boolean    @default(false)
   trackingNumber  String?
   user            User?       @relation(fields: [userId], references: [id])
   orderItems      OrderItem[]

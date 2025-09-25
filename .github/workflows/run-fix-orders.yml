@@ -1,0 +1,37 @@
+name: Run Stripe session -> Order fix (manual)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  run-fix:
+    name: Run fix-orders-from-stripe-session
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run fix script (apply)
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          # If your scripts rely on DATABASE_URL or other secrets, add them in repository secrets
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          # Run the script and save stdout/stderr to stripe-apply.log and create a backup jsonl in the workspace
+          node scripts/fix-orders-from-stripe-session.js --apply --backup-file=./stripe-orders-backup.jsonl 2>&1 | tee stripe-apply.log
+
+      - name: Upload logs and backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: stripe-fix-outputs
+          path: |
+            stripe-apply.log
+            stripe-orders-backup.jsonl

@@ -1,8 +1,63 @@
 import { test, expect } from '@playwright/test'
+import { prisma } from '@/lib/prisma'
 
 const TEST_EMAIL = process.env.E2E_TEST_EMAIL || 'e2e@example.com'
 const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD || 'password123'
-const PRODUCER_ID = process.env.E2E_PRODUCER_ID || '' // set to a valid producer id before running tests
+let PRODUCER_ID = process.env.E2E_PRODUCER_ID || '' // set to a valid producer id before running tests
+
+// If PRODUCER_ID is not provided, create a test producer record before running E2E
+test.describe.configure({ timeout: 120000 })
+
+test.beforeAll(async () => {
+  if (!PRODUCER_ID) {
+    const p = await prisma.producer.create({
+      data: {
+        name: `E2E Test Producer ${Date.now()}`,
+        description: 'Automatically created for E2E tests',
+      },
+    })
+    PRODUCER_ID = p.id
+  }
+})
+
+test.afterAll(async () => {
+  // cleanup only if we created the producer in this run (env var was not set)
+  if (!process.env.E2E_PRODUCER_ID && PRODUCER_ID) {
+    try {
+      await prisma.producer.delete({ where: { id: PRODUCER_ID } })
+    } catch (e) {
+      // ignore cleanup errors
+    }
+  }
+})
+
+let createdUserId: string | undefined
+test.beforeAll(async () => {
+  const existing = await prisma.user.findUnique({ where: { email: TEST_EMAIL } })
+  if (!existing) {
+    // create a test user with bcrypt hashed password
+    const bcrypt = await import('bcryptjs')
+    const hash = bcrypt.hashSync(TEST_PASSWORD, 10)
+    const u = await prisma.user.create({
+      data: {
+        email: TEST_EMAIL,
+        name: 'E2E Test User',
+        password: hash,
+      },
+    })
+    createdUserId = u.id
+  }
+})
+
+test.afterAll(async () => {
+  if (createdUserId) {
+    try {
+      await prisma.user.delete({ where: { id: createdUserId } })
+    } catch (e) {
+      // ignore
+    }
+  }
+})
 
 test.describe('Favorite flow', () => {
   test.beforeEach(async ({ page }) => {

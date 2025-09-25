@@ -9,7 +9,7 @@ export function initSentry(dsn?: string) {
   });
 }
 
-export function captureException(err: Error, extra?: Record<string, any>) {
+export function captureException(err: Error, extra?: Record<string, unknown>) {
   try {
     Sentry.captureException(err, { extra });
   } catch (e) {
@@ -17,9 +17,9 @@ export function captureException(err: Error, extra?: Record<string, any>) {
   }
 }
 
-export function captureMessage(msg: string, level: any = 'info') {
+export function captureMessage(msg: string, level: 'fatal' | 'error' | 'warning' | 'info' | 'debug' = 'info') {
   try {
-    Sentry.captureMessage(msg, level as any);
+    Sentry.captureMessage(msg, level);
   } catch (e) {
     // swallow
   }
