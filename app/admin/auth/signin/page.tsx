@@ -15,7 +15,7 @@ export default function AdminSignInPage() {
 
   useEffect(() => {
     // URLパラメータからエラーメッセージを取得
-    const errorParam = searchParams.get('error')
+    const errorParam = searchParams?.get('error')
     if (errorParam === 'insufficient_permissions') {
       setError('管理画面にアクセスするには管理者権限が必要です。一般ユーザアカウントではアクセスできません。')
     }
@@ -44,7 +44,7 @@ export default function AdminSignInPage() {
         // セッション確認後、管理画面にリダイレクト
         const session = await getSession()
         if (session?.user.role === 'ADMIN') {
-          const returnTo = searchParams.get('callbackUrl') || '/admin'
+          const returnTo = (searchParams?.get('callbackUrl') as string) || '/admin'
           router.push(returnTo)
         } else {
           // 一般ユーザアカウントの場合は明確に拒否
