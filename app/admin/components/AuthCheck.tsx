@@ -14,7 +14,7 @@ export default function AuthCheck({ children }: AuthCheckProps) {
   const pathname = usePathname()
 
   // 認証ページはチェックをスキップ
-  const isAuthPage = pathname.includes('/auth/')
+  const isAuthPage = pathname?.includes('/auth/') || false
 
   useEffect(() => {
     if (status === 'loading') return // まだロード中
@@ -23,7 +23,7 @@ export default function AuthCheck({ children }: AuthCheckProps) {
     if (!isAuthPage) {
       if (!session) {
         // 未ログインの場合、管理者ログインページにリダイレクト
-        const currentUrl = pathname + (typeof window !== 'undefined' ? window.location.search : '')
+  const currentUrl = (pathname || '/') + (typeof window !== 'undefined' ? window.location.search : '')
         router.push(`/admin/auth/signin?callbackUrl=${encodeURIComponent(currentUrl)}`)
         return
       }
