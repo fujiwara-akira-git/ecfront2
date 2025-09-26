@@ -891,9 +891,13 @@ export const stripeProvider: Provider = {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
     // TEMP LOG: print incoming signature header and a short preview of the raw body to console
     try {
-      const bodyPreview = typeof rawBody === 'string' ? rawBody.slice(0, 200) : JSON.stringify(rawBody).slice(0, 200)
+      // Use the function parameters (body, headers). Avoid referencing undefined
+      // variables like `rawBody` or `req` which caused the earlier logging to fail
+      const bodyPreview = typeof body === 'string' ? body.slice(0, 200) : JSON.stringify(body).slice(0, 200)
+      const host = (headers && (headers.host || headers['x-forwarded-host'])) || ''
+      const url = host ? (String(host).replace(/\/+$/, '') + '/api/stripe/webhook') : 'unknown'
       // Print a single-line JSON to make log parsing easier
-      console.log(JSON.stringify({ ts: new Date().toISOString(), action: 'incoming_webhook_preview', url: ((headers && (headers.host || '')) + (req && req.url ? req.url : '')), stripe_signature_header: sig, webhookSecretPresent: !!webhookSecret, bodyPreview }))
+      console.log(JSON.stringify({ ts: new Date().toISOString(), action: 'incoming_webhook_preview', url, stripe_signature_header: sig, webhookSecretPresent: !!webhookSecret, bodyPreview }))
     } catch (e) {
       console.log('[stripe:debug] failed to log incoming webhook preview', e)
     }
