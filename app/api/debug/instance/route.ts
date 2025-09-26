@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
@@ -8,7 +8,7 @@ function tailLines(text: string, n = 200) {
   return lines.slice(-n)
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const tmpDir = os.tmpdir()
     const files = {

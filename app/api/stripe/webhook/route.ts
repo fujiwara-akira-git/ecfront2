@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { stripeProvider } from '@/lib/providers/stripe'
 import { appendFileSync } from 'fs'
 import path from 'path'
@@ -96,10 +97,30 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.warn('[webhook] failed to write instance id marker:', e)
       }
-      // Return the instanceId in the JSON response so the caller can confirm
-      // which instance handled their replay. This is a temporary debug aid and
-      // should be removed once investigation is complete.
-      return NextResponse.json({ received: true, instanceId })
+      // Compute and return lightweight HMAC debug info (do not expose secret)
+      // so the caller can immediately correlate what header was received and
+      // what this instance computed for the same timestamp+body.
+      try {
+        const sigHeader = sig
+        const parts = String(sigHeader).split(',').map(s => s.trim())
+        const tPart = parts.find(p => p.startsWith('t='))
+        const v1Part = parts.find(p => p.startsWith('v1='))
+        const parsedTimestamp = tPart ? tPart.split('=')[1] : null
+        const receivedV1 = v1Part ? v1Part.split('=')[1] : null
+        let computedV1: string | null = null
+        try {
+          const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+          if (webhookSecret && parsedTimestamp) {
+            computedV1 = crypto.createHmac('sha256', String(webhookSecret)).update(`${parsedTimestamp}.${body}`).digest('hex')
+          }
+        } catch (e) {
+          // best-effort; do not block response on debug calculation
+          console.warn('[webhook] failed to compute debug HMAC:', e)
+        }
+        return NextResponse.json({ received: true, instanceId, debug: { parsed_timestamp: parsedTimestamp, received_v1: receivedV1, computed_v1: computedV1 } })
+      } catch (e) {
+        return NextResponse.json({ received: true, instanceId })
+      }
     } catch (e) {
       // If UUID import or write fails, fall back to simple response indicating
       // reception. Do not block normal processing.
