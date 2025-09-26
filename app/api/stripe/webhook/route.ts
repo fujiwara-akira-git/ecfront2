@@ -79,7 +79,27 @@ export async function POST(request: NextRequest) {
       } catch (ee) {
         console.warn('[webhook] failed to write persistent error log (invalid signature):', ee)
       }
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+      // Attempt to provide lightweight debug info in the response for
+      // correlation: parsed timestamp from header, the received v1, and
+      // the instance-computed v1 for the same timestamp+body. Do not
+      // expose the webhook secret itself.
+      try {
+        const sigParts = String(sig).split(',').map(s => s.trim())
+        const tPart = sigParts.find(p => p.startsWith('t='))
+        const v1Part = sigParts.find(p => p.startsWith('v1='))
+        const parsedTimestamp = tPart ? tPart.split('=')[1] : null
+        const receivedV1 = v1Part ? v1Part.split('=')[1] : null
+        let computedV1: string | null = null
+        try {
+          const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+          if (webhookSecret && parsedTimestamp) {
+            computedV1 = crypto.createHmac('sha256', String(webhookSecret)).update(`${parsedTimestamp}.${body}`).digest('hex')
+          }
+        } catch (e) { /* best-effort */ }
+        return NextResponse.json({ error: 'Invalid signature', debug: { parsed_timestamp: parsedTimestamp, received_v1: receivedV1, computed_v1: computedV1 } }, { status: 400 })
+      } catch (e) {
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+      }
     }
 
     // Process webhook event
