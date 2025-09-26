@@ -889,6 +889,14 @@ export const stripeProvider: Provider = {
   async verifyWebhook(headers: Record<string, string>, body: string): Promise<{ valid: boolean; payload?: Stripe.Event | any }> {
     const sig = headers['stripe-signature'] || headers['Stripe-Signature'] || ''
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+    // TEMP LOG: print incoming signature header and a short preview of the raw body to console
+    try {
+      const bodyPreview = typeof rawBody === 'string' ? rawBody.slice(0, 200) : JSON.stringify(rawBody).slice(0, 200)
+      // Print a single-line JSON to make log parsing easier
+      console.log(JSON.stringify({ ts: new Date().toISOString(), action: 'incoming_webhook_preview', url: ((headers && (headers.host || '')) + (req && req.url ? req.url : '')), stripe_signature_header: sig, webhookSecretPresent: !!webhookSecret, bodyPreview }))
+    } catch (e) {
+      console.log('[stripe:debug] failed to log incoming webhook preview', e)
+    }
     if (!webhookSecret) {
       // No webhook secret configured: accept and parse JSON (dev only)
       const p = JSON.parse(body || '{}')
