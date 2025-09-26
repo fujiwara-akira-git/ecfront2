@@ -13,7 +13,7 @@ function SignInForm() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const searchParams = useSearchParams()
-  const returnTo = searchParams.get('returnTo') || '/shop'
+  const returnTo = (searchParams?.get('returnTo') as string) || '/shop'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
