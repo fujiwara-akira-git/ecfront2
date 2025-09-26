@@ -931,8 +931,17 @@ export const stripeProvider: Provider = {
             const tsVal = tPart ? tPart.split('=')[1] : null
             const recvV1 = v1Part ? v1Part.split('=')[1] : null
             const computed = tsVal ? crypto.createHmac('sha256', String(webhookSecret)).update(`${tsVal}.${typeof body === 'string' ? body : JSON.stringify(body)}`).digest('hex') : null
+            // Compute a short, non-sensitive fingerprint of the webhook secret so we can
+            // detect per-instance secret parity without logging the secret itself.
+            const webhookSecretFp = (() => {
+              try {
+                return crypto.createHash('sha256').update(String(webhookSecret)).digest('hex').slice(0, 8)
+              } catch (e) {
+                return null
+              }
+            })()
             const dbgPath2 = path.join(os.tmpdir(), 'stripe-webhook-hmac-debug.log')
-            const dbgEntry2 = JSON.stringify({ ts: new Date().toISOString(), action: 'incoming_webhook_hmac_debug', parsed_timestamp: tsVal, received_v1: recvV1, computed_v1: computed ? computed : null }) + '\n'
+            const dbgEntry2 = JSON.stringify({ ts: new Date().toISOString(), action: 'incoming_webhook_hmac_debug', parsed_timestamp: tsVal, received_v1: recvV1, computed_v1: computed ? computed : null, webhook_secret_fp: webhookSecretFp }) + '\n'
             try { fs.appendFileSync(dbgPath2, dbgEntry2) } catch (e) { /* best-effort */ }
           }
         } catch (e) { /* best-effort */ }
@@ -956,7 +965,66 @@ export const stripeProvider: Provider = {
       stripeDebug('verifyWebhook: constructed event type=', event.type, 'id=', event.id)
       return { valid: true, payload: event }
     } catch (err) {
-      console.error('stripe webhook verification failed', err)
+      console.error('stripe webhook verification failed (primary header)', err)
+      // Guarded fallback: some platforms/proxies may mutate or move the Stripe
+      // signature header (for example into a `forwarded` param). To avoid
+      // weakening security unintentionally, only attempt an alternate-header
+      // re-check when explicitly enabled via STRIPE_WEBHOOK_ALLOW_ALTERNATE_HEADER.
+      const allowAlternate = String(process.env.STRIPE_WEBHOOK_ALLOW_ALTERNATE_HEADER || '').toLowerCase() === 'true'
+      if (!allowAlternate) {
+        return { valid: false }
+      }
+
+      try {
+        // Try to find an alternate signature value in other headers (common
+        // places: 'forwarded' header or other proxy-provided header values).
+        const hdrs = headers || {}
+        const headerValues = Object.values(hdrs).filter(Boolean).map(String)
+        let altSig: string | null = null
+        for (const hv of headerValues) {
+          // look for t=<ts>,v1=<hex> pattern anywhere in the header value
+          const m = hv.match(/t=\d+,v1=[0-9a-fA-F]+/) || hv.match(/t%3D\d+%2Cv1%3D[0-9a-fA-F]+/)
+          if (m) {
+            // if URL-encoded, decode
+            const candidate = decodeURIComponent(m[0])
+            altSig = candidate
+            break
+          }
+          // also accept a direct sig=... piece sometimes present in forwarded
+          const m2 = hv.match(/sig=([^;,"]+)/)
+          if (m2 && m2[1]) {
+            // try to find t=... inside the sig param
+            const decoded = decodeURIComponent(m2[1])
+            const m3 = decoded.match(/t=\d+,v1=[0-9a-fA-F]+/)
+            if (m3) { altSig = m3[0]; break }
+          }
+        }
+
+        if (altSig) {
+              try {
+                const fs = await import('fs')
+                const path = await import('path')
+                const dbgPath2 = path.join(os.tmpdir(), 'stripe-webhook-hmac-debug.log')
+                // log attempt to try alternate header
+                try {
+                  const webhookSecretFp2 = (() => {
+                    try { return crypto.createHash('sha256').update(String(webhookSecret)).digest('hex').slice(0, 8) } catch (e) { return null }
+                  })()
+                  fs.appendFileSync(dbgPath2, JSON.stringify({ ts: new Date().toISOString(), action: 'attempt_alternate_sig_header', usedAltSig: altSig, webhook_secret_fp: webhookSecretFp2 }) + '\n')
+                } catch (e) { /* best-effort */ }
+                const _stripe = stripe as Stripe
+                const eventAlt = _stripe.webhooks.constructEvent(body, altSig, webhookSecret)
+                stripeDebug('verifyWebhook: constructed event with alternate header, type=', eventAlt.type, 'id=', eventAlt.id)
+                return { valid: true, payload: eventAlt }
+              } catch (altErr) {
+                console.error('stripe webhook verification failed (alternate header) ', altErr)
+                return { valid: false }
+              }
+        }
+      } catch (outerErr) {
+        console.error('stripe webhook alternate-header attempt failed:', outerErr)
+      }
+
       return { valid: false }
     }
   },
