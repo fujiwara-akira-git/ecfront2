@@ -898,6 +898,29 @@ export const stripeProvider: Provider = {
       const url = host ? (String(host).replace(/\/+$/, '') + '/api/stripe/webhook') : 'unknown'
       // Print a single-line JSON to make log parsing easier
       console.log(JSON.stringify({ ts: new Date().toISOString(), action: 'incoming_webhook_preview', url, stripe_signature_header: sig, webhookSecretPresent: !!webhookSecret, bodyPreview }))
+
+      // TEMP_EXTRA_DEBUG: write the exact bytes (base64) of the received body and
+      // the full headers object to a tmp file so we can compare server-seen
+      // payload bytes later. This is temporary and safe (no secret disclosure
+      // beyond the stripe-signature header which we need to debug verification).
+      try {
+        const fs = await import('fs')
+        const path = await import('path')
+        const dbgPath = path.join(os.tmpdir(), 'stripe-webhook-raw-base64.log')
+        const entry = JSON.stringify({
+          ts: new Date().toISOString(),
+          action: 'incoming_webhook_raw_base64',
+          stripe_signature_header: sig,
+          webhookSecretPresent: !!webhookSecret,
+          headers: headers,
+          body_base64: Buffer.from(typeof body === 'string' ? body : JSON.stringify(body)).toString('base64')
+        }) + '\n'
+        try { fs.appendFileSync(dbgPath, entry) } catch (e) { /* best-effort */ }
+        // Also emit the same JSON to console (single-line) for remote log capture
+        console.log(JSON.stringify({ ts: new Date().toISOString(), action: 'incoming_webhook_raw_base64_console', stripe_signature_header: sig, body_base64_preview: Buffer.from(typeof body === 'string' ? body : JSON.stringify(body)).toString('base64').slice(0, 200) }))
+      } catch (e) {
+        // ignore any failures writing debug artifacts
+      }
     } catch (e) {
       console.log('[stripe:debug] failed to log incoming webhook preview', e)
     }
