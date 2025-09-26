@@ -84,7 +84,28 @@ export async function POST(request: NextRequest) {
     // Process webhook event
     await stripeProvider.handleWebhookEvent(verification.payload)
 
-    return NextResponse.json({ received: true })
+    // TEMP DEBUG: generate an instance identifier and write to tmp so we can
+    // correlate which Vercel instance handled this request. This helps
+    // diagnose load-balanced cases where our tmp logs are per-instance.
+    try {
+      const { v4: uuidv4 } = await import('uuid')
+      const instanceId = uuidv4()
+      try {
+        const idLogPath = path.join(os.tmpdir(), 'stripe-webhook-instance-ids.log')
+        appendFileSync(idLogPath, JSON.stringify({ ts: new Date().toISOString(), instanceId, eventId: (() => { try { return JSON.parse(body)?.id } catch { return null } })() }) + '\n')
+      } catch (e) {
+        console.warn('[webhook] failed to write instance id marker:', e)
+      }
+      // Return the instanceId in the JSON response so the caller can confirm
+      // which instance handled their replay. This is a temporary debug aid and
+      // should be removed once investigation is complete.
+      return NextResponse.json({ received: true, instanceId })
+    } catch (e) {
+      // If UUID import or write fails, fall back to simple response indicating
+      // reception. Do not block normal processing.
+      console.warn('[webhook] instance-id debug failed:', e)
+      return NextResponse.json({ received: true })
+    }
 
   } catch (err: any) {
     console.error('[webhook] error processing webhook:', {
