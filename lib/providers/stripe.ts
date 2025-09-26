@@ -1,4 +1,5 @@
 import Stripe from 'stripe'
+import crypto from 'crypto'
 
 // Narrowed type for the parts of Checkout Session we rely on in webhook handling.
 
@@ -918,6 +919,23 @@ export const stripeProvider: Provider = {
         try { fs.appendFileSync(dbgPath, entry) } catch (e) { /* best-effort */ }
         // Also emit the same JSON to console (single-line) for remote log capture
         console.log(JSON.stringify({ ts: new Date().toISOString(), action: 'incoming_webhook_raw_base64_console', stripe_signature_header: sig, body_base64_preview: Buffer.from(typeof body === 'string' ? body : JSON.stringify(body)).toString('base64').slice(0, 200) }))
+        // Additional TEMP debug: if webhookSecret present, parse signature header and
+        // compute server-side HMAC for the timestamp and body and append to a separate
+        // tmp log. We DO NOT log the secret itself; only the computed hex hmac and
+        // parsed timestamp/v1 for comparison.
+        try {
+          if (webhookSecret) {
+            const sigParts = String(sig).split(',').map(s => s.trim())
+            const tPart = sigParts.find(p => p.startsWith('t='))
+            const v1Part = sigParts.find(p => p.startsWith('v1='))
+            const tsVal = tPart ? tPart.split('=')[1] : null
+            const recvV1 = v1Part ? v1Part.split('=')[1] : null
+            const computed = tsVal ? crypto.createHmac('sha256', String(webhookSecret)).update(`${tsVal}.${typeof body === 'string' ? body : JSON.stringify(body)}`).digest('hex') : null
+            const dbgPath2 = path.join(os.tmpdir(), 'stripe-webhook-hmac-debug.log')
+            const dbgEntry2 = JSON.stringify({ ts: new Date().toISOString(), action: 'incoming_webhook_hmac_debug', parsed_timestamp: tsVal, received_v1: recvV1, computed_v1: computed ? computed : null }) + '\n'
+            try { fs.appendFileSync(dbgPath2, dbgEntry2) } catch (e) { /* best-effort */ }
+          }
+        } catch (e) { /* best-effort */ }
       } catch (e) {
         // ignore any failures writing debug artifacts
       }
