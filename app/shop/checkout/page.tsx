@@ -163,29 +163,14 @@ export default function CheckoutPage() {
     setIsLoading(true)
     try {
       // 住所正規化: zipcloud の address3 に都道府県/市区郡が重複している場合は先頭の重複部分を取り除く
+
+      // 都道府県・市区郡・番地を分割して取得
       const stateFromZip = searchParams.get('state') || ''
       const cityFromZip = searchParams.get('city') || ''
-      const sanitizeAddress = (stateStr: string, cityStr: string, addr: string) => {
-        if (!addr) return addr
-        let s = addr.trim()
-        const city = cityStr.trim()
-        const state = stateStr.trim()
-        // 先頭に市区郡が重複している場合に削除
-        if (city && s.startsWith(city)) {
-          s = s.substring(city.length).trim()
-        }
-        // 先頭に都道府県が重複している場合に削除
-        if (state && s.startsWith(state)) {
-          s = s.substring(state.length).trim()
-        }
-        // 不要な先頭の区切り文字を削除
-        s = s.replace(/^[、\s\-ー〜~]+/, '')
-        return s
-      }
+      const addressRest = shippingAddress.trim()
 
-      const normalizedAddress = sanitizeAddress(stateFromZip, cityFromZip, shippingAddress)
       // 注文データを構築（送料を含む）
-      // ユーザー入力値を優先してcustomerInfoにセット
+      // customerInfoに分割した住所情報をセット
       const orderData = {
         items: state.items.map(item => ({
           name: item.name,
@@ -197,7 +182,9 @@ export default function CheckoutPage() {
         shippingFee: shippingFee, // 配送料を反映
         deliveryService: deliveryService, // 配送方法を反映
         customerInfo: {
-          address: normalizedAddress,
+          state: stateFromZip,
+          city: cityFromZip,
+          address: addressRest,
           postalCode: postalCode,
           phone: phoneNumber,
           email: customerEmail || session?.user?.email || '',
@@ -207,7 +194,9 @@ export default function CheckoutPage() {
           userId: session?.user?.id || '',
           userName: session?.user?.name || '',
           userEmail: customerEmail || session?.user?.email || undefined,
-          shippingAddress: normalizedAddress,
+          shippingPrefecture: stateFromZip,
+          shippingCity: cityFromZip,
+          shippingRest: addressRest,
           postalCode: postalCode,
           phoneNumber: phoneNumber,
           deliveryService: deliveryService,

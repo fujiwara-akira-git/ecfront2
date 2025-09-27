@@ -1500,25 +1500,26 @@ export const stripeProvider: Provider = {
                   console.warn('[stripe] metadata.expectedTotal differs from session.amount_total (creating new order); using metadata as source-of-truth', { sessionId, metaExpectedTotalNew, sessionAmount: s.amount_total })
                 }
                 const addrPartsCreate = splitJapaneseAddress(shippingAddress || (s && s.metadata && s.metadata.shippingAddress) || undefined)
+                  // customerInfoから都道府県・市区郡・番地を優先して保存
+                  const customerInfo = (s && s.metadata && typeof s.metadata === 'object' && (s.metadata as any).state) ? s.metadata as any : {}
                   order = await withRetries(() => prisma.order.create({
-                  data: ({
-                    totalAmount: resolvedTotalForCreate,
-                    currency: s.currency || 'jpy',
-                    status: 'paid',
-                    customerEmail: finalCustomerEmail,
-                    customerName: finalCustomerName,
-                    customerPhone: finalCustomerPhone,
-                              // Use shippingAddress (possibly from metadata) when creating new order
-                              shippingAddress: shippingAddress || '',
-                              shippingPrefecture: addrPartsCreate.prefecture || undefined,
-                              shippingCity: addrPartsCreate.city || undefined,
-                              shippingRest: addrPartsCreate.rest || undefined,
-                    subtotal: (s.amount_total || 0) - shippingCost,
-                    shippingFee: shippingCost,
-                    notes: `Stripe Session ID: ${sessionId}`,
-                    userId: matchedUserId ? matchedUserId : undefined
-                  } as Prisma.OrderUncheckedCreateInput)
-                }))
+                    data: ({
+                      totalAmount: resolvedTotalForCreate,
+                      currency: s.currency || 'jpy',
+                      status: 'paid',
+                      customerEmail: finalCustomerEmail,
+                      customerName: finalCustomerName,
+                      customerPhone: finalCustomerPhone,
+                      shippingAddress: shippingAddress || '',
+                      shippingPrefecture: customerInfo.state || addrPartsCreate.prefecture || undefined,
+                      shippingCity: customerInfo.city || addrPartsCreate.city || undefined,
+                      shippingRest: customerInfo.address || addrPartsCreate.rest || undefined,
+                      subtotal: (s.amount_total || 0) - shippingCost,
+                      shippingFee: shippingCost,
+                      notes: `Stripe Session ID: ${sessionId}`,
+                      userId: matchedUserId ? matchedUserId : undefined
+                    } as Prisma.OrderUncheckedCreateInput)
+                  }))
               } catch (orderCreateErr: any) {
                 console.error('[stripe][webhook][order-create] error creating order', {
                   eventId: payload.id,
