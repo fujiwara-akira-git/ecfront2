@@ -347,23 +347,42 @@ async function fetchExpandedSession(sessionId: string, payload: Stripe.Event | u
     } catch (e) { /* ignore logging */ }
   } catch (retrieveErr: any) {
     const isResourceMissing = retrieveErr && (retrieveErr.code === 'resource_missing' || retrieveErr?.raw?.code === 'resource_missing' || retrieveErr?.statusCode === 404)
-    if (isResourceMissing) {
+      if (isResourceMissing) {
       console.warn('[stripe] checkout.session not found on Stripe for id (fixture or deleted):', sessionId)
       console.warn('[stripe] retrieve error details:', { code: retrieveErr?.code, message: retrieveErr?.message, statusCode: retrieveErr?.statusCode, type: retrieveErr?.type })
+      try {
+        const fs = await import('fs')
+        const path = await import('path')
+        const dbgDir = os.tmpdir()
+        try { fs.mkdirSync(dbgDir, { recursive: true }) } catch (e) { /* ignore */ }
+        const dbgPath = path.join(dbgDir, 'stripe-full-debug.log')
+        const requestLogUrl = retrieveErr?.request_log_url || retrieveErr?.requestLogUrl || retrieveErr?.raw?.request_log_url || retrieveErr?.raw?.request_log || undefined
+        const dump = { ts: new Date().toISOString(), action: 'session_retrieve_resource_missing', eventId: payloadAny?.id, sessionId, retrieveErr: { code: retrieveErr?.code, message: retrieveErr?.message, statusCode: retrieveErr?.statusCode, requestLogUrl } }
+        try { fs.appendFileSync(dbgPath, JSON.stringify(dump) + '\n') } catch (e) { /* best-effort */ }
+      } catch (e) { /* ignore logging failures */ }
+      // If payload fallback is disabled in production, we still want to allow a
+      // fallback for checkout.session.completed events because Stripe sometimes
+      // returns resource_missing for sessions (fixture / deleted) while the
+      // webhook payload still contains the full session object needed to
+      // finalize orders. Keep the restrictive behavior for other event types.
       if (disablePayloadFallbackInProd && process.env.NODE_ENV === 'production') {
-        console.warn('[stripe] payload fallback disabled in production by DISABLE_STRIPE_PAYLOAD_FALLBACK_IN_PRODUCTION; marking event processed and skipping')
-        try {
-          const eid = payloadAny && typeof (payloadAny as any).id === 'string' ? (payloadAny as any).id : undefined
-          const etype = payloadAny && typeof (payloadAny as any).type === 'string' ? (payloadAny as any).type : undefined
-          if (eid && etype) {
-            await prisma.stripeEvent.upsert({ where: { id: eid }, create: { id: eid, type: etype, payload: payloadAny as Prisma.InputJsonValue, processed: true, processedAt: new Date() }, update: { processed: true, processedAt: new Date() } })
-          } else {
-            console.warn('[stripe] cannot mark event processed: missing id/type on payloadAny')
+        const evType = payloadAny && typeof (payloadAny as any).type === 'string' ? (payloadAny as any).type : undefined
+        if (evType !== 'checkout.session.completed') {
+          console.warn('[stripe] payload fallback disabled in production by DISABLE_STRIPE_PAYLOAD_FALLBACK_IN_PRODUCTION; marking event processed and skipping (non-checkout.session.completed)')
+          try {
+            const eid = payloadAny && typeof (payloadAny as any).id === 'string' ? (payloadAny as any).id : undefined
+            const etype = payloadAny && typeof (payloadAny as any).type === 'string' ? (payloadAny as any).type : undefined
+            if (eid && etype) {
+              await prisma.stripeEvent.upsert({ where: { id: eid }, create: { id: eid, type: etype, payload: payloadAny as Prisma.InputJsonValue, processed: true, processedAt: new Date() }, update: { processed: true, processedAt: new Date() } })
+            } else {
+              console.warn('[stripe] cannot mark event processed: missing id/type on payloadAny')
+            }
+          } catch (e) {
+            console.warn('[stripe] marking event processed failed (prod fallback disabled):', e)
           }
-        } catch (e) {
-          console.warn('[stripe] marking event processed failed (prod fallback disabled):', e)
+          return { session: null as ExpandedCheckoutSession | null, sessionId, recoveredFromPayload: false }
         }
-        return { session: null as ExpandedCheckoutSession | null, sessionId, recoveredFromPayload: false }
+        console.warn('[stripe] payload fallback disabled in production but allowing checkout.session.completed fallback for resilience')
       }
           try {
             const rawSession = getPayloadObject(payloadAny)
@@ -404,6 +423,16 @@ async function fetchExpandedSession(sessionId: string, payload: Stripe.Event | u
         throw retrieveErr
       }
     }
+    try {
+      // If not a resource_missing case, still write a compact debug entry so
+      // we can correlate the Stripe request in the dashboard when troubleshooting.
+      const fs = await import('fs')
+      const path = await import('path')
+      const dbgPath = path.join(os.tmpdir(), 'stripe-full-debug.log')
+      const requestLogUrl = retrieveErr?.request_log_url || retrieveErr?.requestLogUrl || retrieveErr?.raw?.request_log_url || undefined
+      const dump = { ts: new Date().toISOString(), action: 'session_retrieve_failed', eventId: payloadAny?.id, sessionId, retrieveErr: { code: retrieveErr?.code, message: retrieveErr?.message, statusCode: retrieveErr?.statusCode, requestLogUrl } }
+      try { fs.appendFileSync(dbgPath, JSON.stringify(dump) + '\n') } catch (e) { /* best-effort */ }
+    } catch (e) { /* ignore logging failures */ }
     if (!recoveredFromPayload) {
       console.error('[stripe] failed to retrieve checkout session:', sessionId, { error: retrieveErr?.message, code: retrieveErr?.code, statusCode: retrieveErr?.statusCode })
       throw retrieveErr
