@@ -2,6 +2,153 @@
 
 埼玉県産の新鮮な農産物を販売するモダンなECプラットフォームです。
 
+## 🧹 2025/09/27 一時ファイル・検証用ファイル整理
+
+`tmp/`, `test-results/`, `playwright-report/`, `debug-cart.js`, `test-webhook.js`, `cookies.txt`, `db-backup-20250915.sql`, `Ready!` など不要な一時ファイル・検証用ファイルを削除しました。
+
+運用・開発に不要なファイルは定期的に整理し、リポジトリの保守性を高めています。
+
+## 最新ドキュメント
+主要な運用・開発手順は `docs/` フォルダおよび下記リンクにまとめています。
+
+**[リファクタ計画](./docs/REFACTOR_PLAN.md)**
+**[セットアップガイド](./docs/setup-guide.md)**
+**[認証ガイド](./docs/authentication-guide.md)**
+**[DB移行ガイド](./docs/database-migration.md)**
+**[開発ガイドライン](./docs/development-guidelines.md)**
+**[配送ドキュメント](./docs/delivery.md)**
+**[ローカルHTTPS手順](./docs/local-https.md)**
+
+## 📁 ディレクトリ構成（2025/09/27時点）
+
+```
+ecfront-main2/
+├── app/                # Next.jsアプリ本体（API, UI, 管理画面など）
+├── admin/              # 管理者用ページ
+├── lib/                # 共通ロジック・APIクライアント・プロバイダ
+├── prisma/             # Prismaスキーマ・マイグレーション・シード
+├── public/
+│   └── images/         # 画像（hero, products等サブフォルダ化）
+├── scripts/            # 運用・メンテ・データ移行スクリプト
+│   └── legacy/         # 古い/一時的なスクリプト
+├── docs/
+│   ├── architecture/   # 設計・ER図・技術仕様
+│   ├── api/            # API仕様
+│   └── ...             # 運用・開発ガイド
+├── tests/              # E2E・統合テスト
+├── __tests__/          # ユニットテスト
+├── types/              # 型定義
+├── .github/            # CI/CD・GitHub Actions
+├── .next/              # Next.jsビルド成果物（.gitignore管理）
+├── ...                 # その他設定・環境ファイル
+```
+
+各ディレクトリの詳細・運用方針は `docs/` 配下のドキュメントを参照してください。
+
+## 📁 ディレクトリ詳細・運用ルール
+
+### app/
+Next.js本体。APIルート、UI、管理画面、認証など。新規機能は原則ここに追加。
+
+### admin/
+管理者用ページ。運用管理・商品管理・注文管理など。
+
+### lib/
+共通ロジック、APIクライアント、外部サービス連携。新規プロバイダやユーティリティはここに追加。
+
+### prisma/
+Prisma ORMのスキーマ・マイグレーション・シード。DB構造変更は必ずスキーマ・マイグレーションを更新。
+
+### public/images/
+画像ファイル。用途別サブフォルダ（hero, products等）を推奨。不要画像は定期削除。
+
+### scripts/
+運用・メンテ・データ移行スクリプト。legacy/は古い・一時的なスクリプト。新規運用スクリプトはscripts/直下に追加。
+
+### docs/
+運用・開発・設計・API仕様などのドキュメント。architecture/は設計・ER図、api/はAPI仕様。ドキュメントは常に最新化。
+
+### tests/・__tests__/
+E2E・統合テストはtests/、ユニットテストは__tests__/。テスト追加時は用途に応じて配置。
+
+### types/
+型定義。NextAuthやグローバル型などはここに集約。
+
+### .github/
+CI/CD・GitHub Actions。運用自動化・品質管理の設定。
+
+### .next/
+Next.jsビルド成果物。git管理外（.gitignore）。
+
+### その他
+環境ファイル（.env, .env.local等）はgit管理・漏洩に注意。
+
+---
+
+#### 運用ルール
+- 不要ファイル・一時ファイルは定期的に削除
+- ドキュメント・READMEは常に最新化
+- 新規機能・スクリプトは用途別ディレクトリに追加
+- DB構造変更は必ずprismaスキーマ・マイグレーションを更新
+- 画像・データは用途別サブフォルダ化
+- テストはtests/・__tests__/に用途別配置
+
+## 📚 各ディレクトリのベストプラクティス
+
+### app/
+- 機能追加・修正は必ずPR・レビューを経て反映
+- APIルートはapp/api/配下に集約
+- UIコンポーネントはapp/components/へ
+- ページ/ルートごとにサブディレクトリ化
+
+### lib/
+- 共通ロジックは再利用性・テスト容易性を意識
+- 外部API連携はlib/providers/へ
+- 設定値・環境変数はlib/config.tsで一元管理
+
+### prisma/
+- DB構造変更は必ずschema.prisma・migrations/を更新
+- seedデータはprisma/seed.tsで管理
+- 本番・開発DBの差分はmigrationで吸収
+
+### public/images/
+- 画像は用途別サブフォルダ（hero, products等）へ
+- 不要画像は定期的に削除
+- 画像最適化（サイズ・フォーマット）を推奨
+
+### scripts/
+- 運用・メンテスクリプトはscripts/直下に
+- legacy/は一時的・古いスクリプトのみ
+- スクリプトには必ずコメント・利用手順を記載
+
+### docs/
+- ドキュメントは常に最新化
+- 設計・API仕様はarchitecture/・api/へ分割
+- 運用・開発ガイドはREADME.md・development-guidelines.mdへ
+
+### tests/・__tests__/
+- E2E・統合テストはtests/、ユニットテストは__tests__/
+- テストは自動化・CI連携を推奨
+- テスト追加時は用途・粒度に応じて配置
+
+### types/
+- 型定義は用途別ファイルに分割
+- グローバル型・外部型拡張はtypes/直下に
+
+### .github/
+- CI/CD・自動化はGitHub Actionsで管理
+- ワークフローは分割・命名規則を徹底
+
+### .next/
+- ビルド成果物はgit管理外（.gitignore）
+- 不要キャッシュは定期削除
+
+### その他
+- 環境ファイルは漏洩・誤コミットに注意
+- 機密情報は必ず.env.local等で管理
+
+...existing code...
+
 ## � クイックスタート
 
 ```bash
