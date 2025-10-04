@@ -18,8 +18,8 @@ export async function generateMetadata({ params }: any): Promise<Metadata> {
   return { title: `注文 ${id}` }
 }
 
-export default async function OrderDetail({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
+export default async function OrderDetail({ params }: any) {
+  const { id } = params
 
   const order = await prisma.order.findUnique({
     where: { id },
